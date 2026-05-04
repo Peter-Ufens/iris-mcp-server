@@ -27,17 +27,52 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 
 **Effort estime** : ~2h.
 
-### v0.4.0 - APIs publiques gratuites (cible : juin 2026)
+### v0.4.0 - APIs publiques essentielles (cible : juin 2026)
 
-**Outils ajoutes** : `weather-v1` (Open-Meteo), `time-v1`, `ip-info-v1`, `exchange-rates-v1`
+6 outils sans cle API requise, simples, utiles au quotidien. Source : https://github.com/public-apis/public-apis
 
-**Plus-value** : Ollama est limite par sa date de coupure d'entrainement et n'a pas acces aux donnees temps reel. Avec ces outils, l'agent peut repondre "Quelle est la meteo a Haguenau ?" en interrogeant une API publique gratuite (sans cle API requise).
+| ID | API source | Plus-value |
+|---|---|---|
+| `weather-v1` | Open-Meteo (api.open-meteo.com) | Meteo mondiale sans cle, rate limit genereux. Lyla repond aux questions meteo. |
+| `time-v1` | WorldTimeAPI (worldtimeapi.org) | Heure courante par fuseau horaire. Anti-hallucination dates pour les agents. |
+| `ip-info-v1` | ip-api.com | Info geolocalisation IP. Validation tunnel Cloudflare quand Raspberry installe. |
+| `exchange-rates-v1` | exchangerate.host | Taux de change EUR / USD / etc. |
+| `holidays-v1` | Nager.Date (date.nager.at) | Jours feries par pays. Anti-hallucination calendrier. |
+| `dictionary-v1` | DictionaryAPI.dev | Definitions et synonymes anglais. Enrichit les LLMs locaux moins puissants. |
 
-**Source** : selection depuis https://github.com/public-apis/public-apis (categories Weather, Time, IP, Currency).
-
-**Cas d'usage concret** : Lyla, en mode chat avec Peter, repond a "Il fait quel temps demain ?" en appelant weather-v1.
+**Plus-value globale** : Ollama et les autres LLMs obtiennent des donnees factuelles temps reel (meteo, heure, dates) qu'ils n'ont pas dans leurs poids d'entrainement.
 
 **Effort estime** : ~2h.
+
+### v0.4.5 - APIs etendues (cible : juin 2026)
+
+6 outils supplementaires, sans cle ou avec cle gratuite simple :
+
+| ID | API source | Plus-value |
+|---|---|---|
+| `geocoding-v1` | Nominatim / OpenStreetMap (nominatim.openstreetmap.org) | Adresse -> coordonnees GPS, gratuit sans cle. Combine a weather-v1 = meteo de l'adresse exacte. |
+| `sunrise-sunset-v1` | sunrise-sunset.org | Heures lever / coucher du soleil. Demo Raspberry pour automatisations selon luminosite. |
+| `news-v1` | NewsData.io (free tier 200 req/jour) | Actualites. Veille tech automatisee. |
+| `translate-v1` | MyMemory (free tier 5000 mots/jour) | Traduction. Compense les LLMs locaux moins forts en multilingue. |
+| `random-fact-v1` | uselessfacts.jsph.pl | Faits aleatoires. Demo et tests. |
+| `nasa-apod-v1` | NASA APOD (api.nasa.gov, cle gratuite) | Image astronomique du jour. Demo VAE / portfolio. |
+
+**Effort estime** : ~2h.
+
+### v0.7.x - APIs cloud avancees (futur, post-Raspberry)
+
+Quand le Raspberry sera installe et que les besoins de notification / persistence cloud emergeront :
+
+| ID | API source | Pour quoi |
+|---|---|---|
+| `pushover-v1` | Pushover (pushover.net, ~5 USD one-time) | Notifications push smartphone. Alertes Raspberry vers Peter. |
+| `email-v1` | Mailgun ou SendGrid (free tier) | Envoi email. Alertes critiques. |
+| `mqtt-v1` | Mosquitto local sur Raspberry | IoT leger, sensors. |
+| `cloud-storage-v1` | Dropbox ou Google Drive (OAuth requis) | Backup automatise. Necessite OAuth flow. |
+
+**Effort estime** : ~3-4h (OAuth complexifie).
+
+**Date cible** : selon arrivee Raspberry (juin-juillet 2026 selon paie Peter).
 
 ### v0.5.0 - Memoire partagee locale (cible : juillet 2026)
 
@@ -105,6 +140,46 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 
 **Effort estime** : ~5-6h.
 
+## Outils de developpement et test
+
+Pour tester manuellement les outils MCP en local (sans avoir a passer par Cursor ou Claude Desktop) :
+
+- **MCP Inspector** : https://modelcontextprotocol.io/docs/tools/inspector
+  Outil officiel Anthropic, UI web pour tester un serveur MCP. Lance le serveur en stdio, expose une UI pour appeler les outils manuellement avec leurs arguments. Tres utile pour debug et validation.
+
+Lancement type :
+
+```bash
+npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+Permet a Peter de tester `iris-ping-v1`, `ollama-list-v1`, etc. directement, sans intermediaire LLM.
+
+## Securite
+
+iris-mcp-server suit progressivement les **best practices MCP** documentees par Anthropic :
+https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices
+
+### Niveau actuel (v0.2.0)
+
+- Validation Zod sur les inputs de chaque outil.
+- Sandbox `ALLOWED_ROOTS` pour les operations filesystem (anti path-traversal).
+- Aucune dependance reseau au runtime sauf Ollama localhost.
+- Aucun secret en dur (tout via .env).
+
+### Avant bascule public ou v1.0.0 (lot dedie futur)
+
+Un **Lot Securite** sera planifie avant la bascule public ou a v1.0.0 (transport HTTP/SSE distant) :
+
+- Auth obligatoire (token simple V1, eventuellement mTLS / JWT V2).
+- Rate-limiting par client.
+- Audit logs structures (JSON Lines).
+- Validation stricte des inputs au niveau transport.
+- Politique de versioning des outils.
+- Audit des dependances NPM (npm audit + Snyk gratuit).
+
+Ce lot sera redige par Sharon en se basant sur les guides officiels Anthropic.
+
 ---
 
 ## Calendrier prudent
@@ -124,14 +199,54 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 
 A tout moment, la roadmap peut etre figee. v0.2.0, v0.3.0, ... sont chacune des etats stables et utilisables. Pas d'obligation d'aller jusqu'a v1.0.0.
 
-## Hors scope iris-mcp-server (briques separees)
+## Hors scope iris-mcp-server (briques separees / lots futurs)
 
-Les elements suivants ne font PAS partie d'iris-mcp-server, ils sont dans des briques separees qui interagissent avec lui :
+Les elements suivants ne font PAS partie d'iris-mcp-server. Ils sont planifies dans des projets / lots separes, mais documentes ici pour ne pas les oublier.
+
+### Briques separees actuelles (en dehors de ce repo)
+
 - **n8n / Nora** : orchestration (cron, webhooks, workflow). Appelle les outils iris-mcp-server.
 - **Ollama** : LLMs locaux. Servi par iris-mcp-server via les outils ollama-*.
 - **LiteLLM** : proxy OpenAI-compatible (chemin alternatif vers Ollama). Pas une dependance iris.
 - **Cloudflare** : tunnel d'exposition distante. Configure separement, mais utilise par iris-mcp-server en v1.0.0.
 - **Raspberry Pi 5** : hardware physique. Heberge potentiellement iris-mcp-server + Ollama (petits modeles) en mode fallback.
+
+### Lots futurs (a planifier dans le backlog audits mensuels)
+
+#### Lot Multi-agents orchestration (post v1.0.0)
+
+Quand l'ecosysteme aura besoin de coordonner plusieurs agents qui collaborent (ex : un agent qui delegue a un autre selon la tache), 3 options techniques :
+
+- **Anthropic Agent SDK** (recommande) : integration native Claude, support officiel.
+- **LangGraph** (Python / Langchain) : graphes d'etats puissants, complexe.
+- **CrewAI** (Python, deja explore dans Hybrid-Agentic-Studio/crewai/) : simple, communaute active, mais ajoute une stack Python.
+
+Repo cible potentiel : `peter-agent-orchestrator` ou similaire. **Pas dans iris-mcp-server.**
+
+#### Lot Audit MCP servers tiers
+
+Avant de reinventer un outil dans iris-mcp-server, verifier ce que la communaute MCP a deja publie :
+
+Sources a explorer :
+- https://github.com/modelcontextprotocol/servers (serveurs officiels reference)
+- https://mcp.so (annuaire communautaire centaines de serveurs)
+- https://cursor.directory (annuaire Cursor + MCP, regles + serveurs)
+- https://www.pulsemcp.com/servers
+- https://mcpservers.org/
+
+Resultat attendu :
+- Tableau des serveurs MCP tiers utiles pour Peter (ex : github-mcp officiel pour outils Git tres complets).
+- Decision pour chaque : a integrer dans iris-mcp-server (wrapper) OU a brancher en parallele dans Cursor / Claude Desktop.
+
+Cursor et Claude Desktop supportent **plusieurs serveurs MCP en parallele**. iris-mcp-server n'a pas a tout reinventer.
+
+#### Lot Securite durcissement (avant bascule public ou v1.0.0)
+
+Voir section "Securite" plus haut.
+
+#### Lot Self-hosted SearXNG (alternative gratuite a Brave Search)
+
+Quand Raspberry installe : option d'auto-heberger SearXNG (meta-search engine open source) pour avoir une vraie web search puissante sans dependre d'une API payante.
 
 ## References
 
