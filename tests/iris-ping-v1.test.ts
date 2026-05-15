@@ -15,12 +15,13 @@ describe('iris-ping-v1', () => {
     expect(p.version).toBe(SERVER_VERSION);
     expect(typeof p.uptime_seconds).toBe('number');
     expect(p.uptime_seconds).toBeGreaterThanOrEqual(0);
-    expect(p.tools_count).toBe(5);
+    expect(p.tools_count).toBe(9);
     expect(p.tools_list).toContain('iris-ping-v1');
     expect(p.tools_list).toContain('ollama-list-v1');
     expect(p.tools_list).toContain('ollama-chat-v1');
     expect(p.tools_list).toContain('fs-read-v1');
     expect(p.tools_list).toContain('fs-list-v1');
+    expect(p.tools_list).toContain('git-status-v1');
     expect(p.timestamp).toBeTruthy();
   });
 
@@ -31,6 +32,6 @@ describe('iris-ping-v1', () => {
     expect(result.content[0]!.type).toBe('text');
     const payload = JSON.parse(result.content[0]!.text);
     expect(payload.version).toBeTruthy();
-    expect(payload.tools_count).toBe(5);
+    expect(payload.tools_count).toBe(9);
   });
 });
