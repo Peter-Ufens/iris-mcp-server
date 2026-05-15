@@ -17,7 +17,7 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 
 ## Roadmap a venir
 
-### v0.3.0 - Outils Git (cible : juin 2026)
+### v0.3.0 - Outils Git (livre 2026-05-15)
 
 **Outils ajoutes** : `git-status-v1`, `git-log-v1`, `git-diff-v1`, `git-commit-v1`
 
@@ -27,7 +27,7 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 
 **Effort estime** : ~2h.
 
-### v0.4.0 - APIs publiques essentielles (cible : juin 2026)
+### v0.4.0 - APIs publiques essentielles (livre 2026-05-15)
 
 6 outils sans cle API requise, simples, utiles au quotidien. Source : https://github.com/public-apis/public-apis
 
@@ -36,7 +36,7 @@ Calibre selon les jours productifs reels de Peter (telework + week-ends).
 | `weather-v1` | Open-Meteo (api.open-meteo.com) | Meteo mondiale sans cle, rate limit genereux. Lyla repond aux questions meteo. |
 | `time-v1` | WorldTimeAPI (worldtimeapi.org) | Heure courante par fuseau horaire. Anti-hallucination dates pour les agents. |
 | `ip-info-v1` | ip-api.com | Info geolocalisation IP. Validation tunnel Cloudflare quand Raspberry installe. |
-| `exchange-rates-v1` | exchangerate.host | Taux de change EUR / USD / etc. |
+| `exchange-rates-v1` | open.er-api.com | Taux de change EUR / USD / etc. |
 | `holidays-v1` | Nager.Date (date.nager.at) | Jours feries par pays. Anti-hallucination calendrier. |
 | `dictionary-v1` | DictionaryAPI.dev | Definitions et synonymes anglais. Enrichit les LLMs locaux moins puissants. |
 
