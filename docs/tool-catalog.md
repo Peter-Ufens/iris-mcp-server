@@ -1,8 +1,8 @@
-# Catalogue des outils MCP - iris-mcp-server v0.3.0
+# Catalogue des outils MCP - iris-mcp-server v0.4.0
 
-9 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`). Chaque outil a un ID unique versionne, nouvelle version = nouvel ID (cohabitation possible).
+15 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`). Chaque outil a un ID unique versionne, nouvelle version = nouvel ID (cohabitation possible).
 
-## Outils v0.3.0
+## Outils v0.2.0 - v0.3.0 (base + git)
 
 | ID | Fichier | Categorie | Description |
 |----|---------|-----------|-------------|
@@ -15,6 +15,17 @@
 | `git-log-v1` | `src/tools/git-log-v1.ts` | git | Retourne les N derniers commits d un repo local |
 | `git-diff-v1` | `src/tools/git-diff-v1.ts` | git | Retourne la diff Git (staged, unstaged ou head) |
 | `git-commit-v1` | `src/tools/git-commit-v1.ts` | git | Cree un commit sur les fichiers deja stages (pas de git add implicite) |
+
+## Outils v0.4.0 (APIs publiques cloud)
+
+| ID | Fichier | Categorie | Description |
+|----|---------|-----------|-------------|
+| `weather-v1` | `src/tools/weather-v1.ts` | cloud | Meteo actuelle (Open-Meteo, sans cle API) |
+| `time-v1` | `src/tools/time-v1.ts` | cloud | Heure courante par fuseau horaire (WorldTimeAPI) |
+| `ip-info-v1` | `src/tools/ip-info-v1.ts` | cloud | Geolocalisation IP (ip-api.com) |
+| `exchange-rates-v1` | `src/tools/exchange-rates-v1.ts` | cloud | Taux de change (open.er-api.com) |
+| `holidays-v1` | `src/tools/holidays-v1.ts` | cloud | Jours feries par pays et annee (date.nager.at) |
+| `dictionary-v1` | `src/tools/dictionary-v1.ts` | cloud | Definitions anglais (dictionaryapi.dev) |
 
 ## Pattern d'ID
 
