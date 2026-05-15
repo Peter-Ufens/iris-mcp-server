@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { discoverTools, getRegisteredTools, getUptimeSeconds } from '../src/tools/_registry.js';
 
 describe('_registry', () => {
-  it('decouvre exactement 9 outils', async () => {
+  it('decouvre exactement 15 outils', async () => {
     const tools = await discoverTools();
-    expect(tools).toHaveLength(9);
+    expect(tools).toHaveLength(15);
   });
 
   it('chaque outil a un id, description, category, execute', async () => {
@@ -27,7 +27,7 @@ describe('_registry', () => {
   it('getRegisteredTools retourne les outils apres discover', async () => {
     await discoverTools();
     const tools = getRegisteredTools();
-    expect(tools.length).toBe(9);
+    expect(tools.length).toBe(15);
     expect(tools.map((t) => t.id)).toContain('iris-ping-v1');
   });
 
@@ -35,19 +35,25 @@ describe('_registry', () => {
     expect(getUptimeSeconds()).toBeGreaterThanOrEqual(0);
   });
 
-  it('contient les 9 outils attendus', async () => {
+  it('contient les 15 outils attendus', async () => {
     const tools = await discoverTools();
     const ids = tools.map((t) => t.id).sort();
     expect(ids).toEqual([
+      'dictionary-v1',
+      'exchange-rates-v1',
       'fs-list-v1',
       'fs-read-v1',
       'git-commit-v1',
       'git-diff-v1',
       'git-log-v1',
       'git-status-v1',
+      'holidays-v1',
+      'ip-info-v1',
       'iris-ping-v1',
       'ollama-chat-v1',
       'ollama-list-v1',
+      'time-v1',
+      'weather-v1',
     ]);
   });
 });
