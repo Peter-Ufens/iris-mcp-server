@@ -1,20 +1,24 @@
 # Configuration MCP pour Cursor
 
-Ajouter dans les parametres MCP de Cursor (Settings > MCP Servers) :
+Ajouter dans `~/.cursor/mcp.json` (ou Settings > MCP Servers) :
 
 ```json
 {
   "mcpServers": {
     "iris": {
       "command": "node",
-      "args": ["D:/Hybrid-Agentic-Studio/iris-mcp-server/dist/index.js"],
+      "args": ["D:\\IA-CURSOR\\Iris-MCP\\iris-mcp-server\\dist\\index.js"],
       "env": {
         "OLLAMA_BASE_URL": "http://localhost:11434",
-        "ALLOWED_ROOTS": "D:/Hybrid-Agentic-Studio,D:/Lyla-OS"
+        "ALLOWED_ROOTS": "D:\\IA-CURSOR\\Iris-MCP,D:\\IA-CURSOR,D:\\Hybrid-Agentic-Studio,D:\\Lyla-OS,D:\\Obsidian\\Obsidian\\Peter-Vault-Local"
       }
     }
   }
 }
 ```
 
-Apres modification, redemarrer Cursor. Verifier avec `iris-ping-v1` que le serveur repond.
+Canon code (depuis 2026-07-22) : `D:\IA-CURSOR\Iris-MCP\iris-mcp-server`  
+Repo GitHub : `Peter-Ufens/iris-mcp-server`  
+Ancien chemin Audit-GitHub : obsolete (dossier voue a suppression).
+
+Apres modification, recharger les MCP Cursor. Verifier avec `iris-ping-v1`.
