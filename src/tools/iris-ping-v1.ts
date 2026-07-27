@@ -1,7 +1,8 @@
 import type { IrisTool } from './_types.js';
 import { getRegisteredTools, getUptimeSeconds } from './_registry.js';
+import { SERVER_VERSION } from '../version.js';
 
-export const SERVER_VERSION = '0.4.2';
+export { SERVER_VERSION };
 
 export function buildPingPayload() {
   const tools = getRegisteredTools();
