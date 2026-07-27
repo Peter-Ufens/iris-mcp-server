@@ -1,53 +1,87 @@
 # iris-mcp-server
 
-> Repo GitHub `Peter-Ufens/iris-mcp-server` depuis 2026-05-03 (PRIVE, decision Peter). Pivot du scaffold Python (Lot F) vers cette base TypeScript : [docs/adr/0003-pivot-python-vers-typescript.md](docs/adr/0003-pivot-python-vers-typescript.md).
+> Repo GitHub public : [github.com/Peter-Ufens/iris-mcp-server](https://github.com/Peter-Ufens/iris-mcp-server)  
+> Projet perso · reconversion ingenieur IA (Peter UFENS) · lab local-first.
 
-Serveur MCP (Model Context Protocol) modulaire pour Iris - ecosysteme IA local-first.
+Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-## Documentation projet
+**Version :** `0.4.2` · **21 outils** · **88 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
-- Decisions d'architecture : [docs/adr/](docs/adr/)
-- Identite Iris : [docs/identity/](docs/identity/)
-- Brouillons (ex. sprint Lot G) : [docs/drafts/](docs/drafts/)
-- Recherche MCP (gateways, open source, Cursor) : [docs/mcp-native-gateways-research.md](docs/mcp-native-gateways-research.md), [docs/mcp-open-source-et-local.md](docs/mcp-open-source-et-local.md), [docs/mcp-cursor-config.md](docs/mcp-cursor-config.md)
+---
+
+## Pour les visiteurs (conseiller FT, recruteurs, curieux)
+
+**C'est quoi ?** Un serveur qui branche des assistants IA (Cursor, Claude) sur des outils concrets : fichiers locaux, Git, Ollama (LLM local), APIs publiques (meteo, traduction, etc.). Standard ouvert [Model Context Protocol](https://modelcontextprotocol.io/).
+
+**Ce qui fonctionne aujourd'hui (juillet 2026)**
+
+| Element | Etat |
+|---|---|
+| 21 outils MCP operationnels | OK, testes (Vitest 88/88) |
+| Integration Cursor + Claude Desktop | OK (stdio local) |
+| Ollama local (liste modeles + chat) | OK |
+| Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
+| 12 APIs cloud sans compte perso | OK (meteo, heure, news, traduction, NASA APOD, etc.) |
+| Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
+| Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
+
+**Ce que ca demontre :** capacite a concevoir un outil technique documente, teste, versionne, utile dans un ecosysteme IA personnel (vault Obsidian + agents + LLM local). Projet en **pause fonctionnelle** : le socle est la, la suite viendra avec Lyla / Agent-Communication.
+
+**Auteur :** Peter UFENS · licence MIT.
+
+---
+
+| Sujet | Fichier |
+|---|---|
+| Config Cursor | [docs/cursor-config.md](docs/cursor-config.md) |
+| Config Claude Desktop | [docs/claude-desktop-config.md](docs/claude-desktop-config.md) |
+| Catalogue outils | [docs/tool-catalog.md](docs/tool-catalog.md) |
+| Roadmap | [docs/roadmap.md](docs/roadmap.md) |
+| Ajouter un outil | [docs/GUIDE-AJOUTER-OUTIL.md](docs/GUIDE-AJOUTER-OUTIL.md) |
+| ADR serveur (heritage, identite) | [docs/adr/](docs/adr/) — **musée** ; regles actives = hub Iris-MCP |
+| Identite Iris | [docs/identity/](docs/identity/) |
+| ~~mcp-cursor-config~~ | **obsolete** → `cursor-config.md` |
 
 ## Demarrage rapide
 
 ```bash
-# 1. Cloner le depot
-gh repo clone Peter-Ufens/iris-mcp-server
 cd iris-mcp-server
-
-# 2. Installer les dependances
 npm install
-
-# 3. Configurer l'environnement
-cp .env.example .env
-# Editer .env si necessaire (OLLAMA_BASE_URL, ALLOWED_ROOTS)
-
-# 4. Build + tests
+cp .env.example .env   # editer ALLOWED_ROOTS si besoin
 npm run build
 npm test
-
-# 5. Brancher dans Cursor ou Claude Desktop
-# Voir docs/cursor-config.md ou docs/claude-desktop-config.md
+node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 ```
 
-## Outils disponibles (Sprint 1)
+Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-| ID | Description | Categorie |
-|----|-------------|-----------|
-| `iris-ping-v1` | Healthcheck : version, uptime, liste des outils, timestamp | iris |
-| `ollama-list-v1` | Liste les modeles Ollama locaux (GET /api/tags) | ollama |
-| `ollama-chat-v1` | Chat avec un modele Ollama local (POST /api/chat) | ollama |
-| `fs-read-v1` | Lit un fichier (securise par ALLOWED_ROOTS) | filesystem |
-| `fs-list-v1` | Liste un repertoire (securise par ALLOWED_ROOTS) | filesystem |
+## Outils disponibles (v0.4.2 — 21)
 
-## Ajouter un outil
+| ID | Categorie | Description courte |
+|---|---|---|
+| `iris-ping-v1` | iris | Healthcheck version, uptime, liste outils |
+| `ollama-list-v1` | ollama | Modeles Ollama locaux |
+| `ollama-chat-v1` | ollama | Chat avec un modele Ollama |
+| `fs-read-v1` | filesystem | Lit un fichier (ALLOWED_ROOTS) |
+| `fs-list-v1` | filesystem | Liste un repertoire (ALLOWED_ROOTS) |
+| `git-status-v1` | git | Statut Git d'un repo |
+| `git-log-v1` | git | Derniers commits |
+| `git-diff-v1` | git | Diff staged / unstaged / head |
+| `git-commit-v1` | git | Commit (fichiers deja stages) |
+| `weather-v1` | cloud | Meteo (lat/lon, Open-Meteo) |
+| `time-v1` | cloud | Heure par fuseau (WorldTimeAPI) |
+| `ip-info-v1` | cloud | Geoloc IP |
+| `exchange-rates-v1` | cloud | Taux de change |
+| `holidays-v1` | cloud | Jours feries par pays |
+| `dictionary-v1` | cloud | Definition mot anglais |
+| `geocoding-v1` | cloud | Ville → coordonnees GPS |
+| `sunrise-v1` | cloud | Lever / coucher soleil |
+| `news-v1` | cloud | Titres Hacker News |
+| `translate-v1` | cloud | Traduction (MyMemory) |
+| `random-fact-v1` | cloud | Fait aleatoire |
+| `nasa-apod-v1` | cloud | Image astronomique du jour (DEMO_KEY) |
 
-Voir [docs/GUIDE-AJOUTER-OUTIL.md](docs/GUIDE-AJOUTER-OUTIL.md).
-
-En resume : deposer un fichier dans `src/tools/`, exporter un objet `tool: IrisTool`, rebuild. L'outil est auto-decouvert.
+Detail : [docs/tool-catalog.md](docs/tool-catalog.md).
 
 ## Architecture
 
@@ -55,39 +89,31 @@ En resume : deposer un fichier dans `src/tools/`, exporter un objet `tool: IrisT
 iris-mcp-server/
 ├── src/
 │   ├── index.ts              # Point d'entree stdio
-│   ├── server.ts             # Creation du serveur MCP + enregistrement auto
+│   ├── server.ts             # McpServer + enregistrement outils
+│   ├── version.ts            # Version depuis package.json
 │   ├── tools/
-│   │   ├── _types.ts         # Interface IrisTool (contrat extensibilite)
-│   │   ├── _registry.ts      # Auto-decouverte des outils au demarrage
-│   │   ├── iris-ping-v1.ts
-│   │   ├── ollama-list-v1.ts
-│   │   ├── ollama-chat-v1.ts
-│   │   ├── fs-read-v1.ts
-│   │   └── fs-list-v1.ts
+│   │   ├── _types.ts         # Interface IrisTool
+│   │   ├── _registry.ts      # Auto-decouverte
+│   │   └── *-v1.ts           # 21 outils
 │   └── utils/
-│       ├── env.ts            # Chargement .env
-│       └── path-guard.ts     # Validation ALLOWED_ROOTS, anti path-traversal
-├── tests/                    # Tests Vitest
+│       ├── env.ts
+│       ├── path-guard.ts     # ALLOWED_ROOTS, anti traversal
+│       └── git-guard.ts
+├── tests/                    # Vitest (88 tests)
 ├── docs/
-│   ├── adr/                  # ADR (dont pivot Python -> TypeScript)
-│   ├── identity/             # IRIS-MANIFESTE, IRIS-PERSONA
-│   ├── drafts/
-│   ├── cursor-config.md
-│   ├── claude-desktop-config.md
-│   ├── GUIDE-AJOUTER-OUTIL.md
-│   └── mcp-*.md              # Notes recherche MCP
-├── .env.example
-├── package.json
-├── tsconfig.json
-└── vitest.config.ts
+├── dist/                     # Build TypeScript
+└── package.json
 ```
 
-## Sprints futurs
+## Ajouter un outil
 
-- **Sprint 2** : memory-read/write, lyla-health, git-surgery wrapper
-- **Sprint 3** : tech-watch, brave-search, notion-bridge
-- **Sprint 4** : transport HTTP/SSE, multi-client
-- **Sprint 5+** : agents, routing, orchestration
+Deposer un fichier dans `src/tools/`, exporter `tool: IrisTool`, `npm run build`. Voir [GUIDE-AJOUTER-OUTIL.md](docs/GUIDE-AJOUTER-OUTIL.md).
+
+## File reprise (hors ce repo)
+
+- `lyla-health-v1`, `memory-read/write-v1` (Lyla)
+- MCP Bitwarden, catalogue apps PC (projet Iris-MCP hub)
+- Transport HTTP/SSE (v1.0.0 roadmap)
 
 ## Licence
 
