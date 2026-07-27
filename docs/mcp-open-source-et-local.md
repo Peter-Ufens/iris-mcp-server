@@ -25,7 +25,7 @@ Donc : **oui**, tu peux t'appuyer sur des serveurs MCP open source **et** avoir 
 | `npm run build` → `dist/index.js` | Binaire que Cursor lance comme **process enfant** ; communication par **stdin/stdout** (protocole MCP). |
 | Reseau | Ollama **127.0.0.1** + APIs cloud optionnelles (meteo, news, etc.) selon outils actives |
 
-Repo GitHub `Peter-Ufens/iris-mcp-server` : **prive** (decision Peter). Bascule publique : voir [roadmap.md](roadmap.md) § v1.0.0.
+Repo GitHub `Peter-Ufens/iris-mcp-server` : **public** (vitrine juillet 2026).
 
 ---
 
