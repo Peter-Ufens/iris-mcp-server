@@ -1,5 +1,7 @@
 # Sprint 1 — Socle MCP minimal fiable
 
+> **ARCHIVE HISTORIQUE (avril 2026)** — sprint depasse. Etat live : v0.4.2 · 21 outils. Ne pas suivre les chemins Hybrid ci-dessous.
+
 > Prompt pour agent manage Anthropic. Objectif : un serveur MCP qui FONCTIONNE
 > avec 5 outils, stdio, tests, branchable dans Cursor + Claude Desktop en 10 min.
 > PAS de routing, PAS de multi-backend, PAS de registre. Juste un socle solide.
