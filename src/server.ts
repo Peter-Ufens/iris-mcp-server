@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { discoverTools } from './tools/_registry.js';
+import { SERVER_VERSION } from './version.js';
 
 /**
  * Construit le McpServer Iris avec auto-decouverte des outils.
@@ -7,10 +8,10 @@ import { discoverTools } from './tools/_registry.js';
  */
 export async function createIrisMcpServer(): Promise<McpServer> {
   const server = new McpServer(
-    { name: 'iris-mcp-server', version: '1.0.0' },
+    { name: 'iris-mcp-server', version: SERVER_VERSION },
     {
       instructions:
-        'Serveur MCP Iris (Hybrid-Agentic Studio). Outils auto-decouverts avec ID versionne. Transport stdio.',
+        'Serveur MCP Iris (ecosysteme Peter). Outils auto-decouverts avec ID versionne. Transport stdio.',
     },
   );
 
