@@ -13,6 +13,8 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 **C'est quoi ?** Un serveur qui branche des assistants IA (Cursor, Claude) sur des outils concrets : fichiers locaux, Git, Ollama (LLM local), APIs publiques (meteo, traduction, etc.). Standard ouvert [Model Context Protocol](https://modelcontextprotocol.io/).
 
+**Presentation grand public (Gamma) :** [Iris-MCP : brancher les IA sur des outils reels](https://gamma.app/docs/Iris-MCP-brancher-les-IA-sur-des-outils-reels-rzpbly9kqpju074)
+
 **Ce qui fonctionne aujourd'hui (juillet 2026)**
 
 | Element | Etat |
