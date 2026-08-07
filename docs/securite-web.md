@@ -15,12 +15,12 @@ construisent leurs URL eux-memes. La garde est dans `src/utils/url-guard.ts` et
 |---|---|
 | Schema | `https` uniquement (`http`, `file`, `data`, `ftp`... refuses) |
 | Credentials | `https://user:pass@hote` refuse |
-| Hotes locaux | `localhost`, `*.localhost`, `*.local`, `*.internal`, `*.home.arpa` |
+| Hotes locaux | `localhost`, `*.localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan` |
 | IPv4 | `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16` (metadonnees cloud), `172.16/12`, `192.168/16`, `100.64/10`, `192.0.0/24`, `198.18/15`, multicast, reserve |
 | IPv6 | `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, formes IPv4 mappees |
 | DNS | Le nom est resolu avant l'appel : un nom public qui pointe vers une IP privee est refuse |
 | Redirections | Pas de suivi automatique. Max 3 sauts, chaque saut repasse la garde |
-| Content-Type | `text/*`, `application/json` (et `*+json`), `application/xml`, `application/xhtml+xml`. Sinon erreur |
+| Content-Type | `text/*`, `application/json` (et `*+json`), `application/xml` (et `*+xml`), `application/xhtml+xml`. En-tete absent = traite comme du texte. Tout autre type declare : erreur |
 
 ## Plafonds
 
