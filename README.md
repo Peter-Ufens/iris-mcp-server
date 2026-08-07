@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.4.2` · **21 outils** · **88 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.5.0` · **24 outils** · **205 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -17,15 +17,16 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 - Produit Iris : [Iris-MCP : brancher les IA sur des outils reels](https://gamma.app/docs/Iris-MCP-brancher-les-IA-sur-des-outils-reels-rzpbly9kqpju074)
 - Concept MCP (voisin) : [MCP explique simplement](https://gamma.app/docs/MCP-explique-simplement-zdk7hi92hsxsnn1)
 
-**Ce qui fonctionne aujourd'hui (juillet 2026)**
+**Ce qui fonctionne aujourd'hui (aout 2026)**
 
 | Element | Etat |
 |---|---|
-| 21 outils MCP operationnels | OK, testes (Vitest 88/88) |
+| 24 outils MCP operationnels | OK, testes (Vitest 205/205) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 12 APIs cloud sans compte perso | OK (meteo, heure, news, traduction, NASA APOD, etc.) |
+| Outils web (fetch URL, recherche, Wikipedia) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) |
 | Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
 | Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
 
@@ -40,6 +41,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 | Config Cursor | [docs/cursor-config.md](docs/cursor-config.md) |
 | Config Claude Desktop | [docs/claude-desktop-config.md](docs/claude-desktop-config.md) |
 | Catalogue outils | [docs/tool-catalog.md](docs/tool-catalog.md) |
+| Securite outils web (SSRF, plafonds) | [docs/securite-web.md](docs/securite-web.md) |
 | Roadmap | [docs/roadmap.md](docs/roadmap.md) |
 | Ajouter un outil | [docs/GUIDE-AJOUTER-OUTIL.md](docs/GUIDE-AJOUTER-OUTIL.md) |
 | ADR serveur (heritage, identite) | [docs/adr/](docs/adr/) — **musée** ; regles actives = hub Iris-MCP |
@@ -59,7 +61,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.4.2 — 21)
+## Outils disponibles (v0.5.0 - 24)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -84,6 +86,9 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `translate-v1` | cloud | Traduction (MyMemory) |
 | `random-fact-v1` | cloud | Fait aleatoire |
 | `nasa-apod-v1` | cloud | Image astronomique du jour (DEMO_KEY) |
+| `fetch-url-v1` | web | Contenu texte d'une URL https (garde SSRF, plafonds) |
+| `web-search-ddg-v1` | web | Recherche DuckDuckGo Instant Answer (sans cle) |
+| `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
 
 Detail : [docs/tool-catalog.md](docs/tool-catalog.md).
 
@@ -98,12 +103,15 @@ iris-mcp-server/
 │   ├── tools/
 │   │   ├── _types.ts         # Interface IrisTool
 │   │   ├── _registry.ts      # Auto-decouverte
-│   │   └── *-v1.ts           # 21 outils
+│   │   └── *-v1.ts           # 24 outils
 │   └── utils/
 │       ├── env.ts
 │       ├── path-guard.ts     # ALLOWED_ROOTS, anti traversal
-│       └── git-guard.ts
-├── tests/                    # Vitest (88 tests)
+│       ├── git-guard.ts
+│       ├── url-guard.ts      # Garde anti-SSRF des URL client
+│       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
+│       └── html-text.ts      # HTML vers texte
+├── tests/                    # Vitest (205 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json
