@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-07-27) :** **v0.4.2 livree** · **21 outils** · **88 tests** · repo **public** GitHub.  
+> **Etat live (2026-08-07) :** **v0.5.0 livree** · **24 outils** · **205 tests** · repo **public** GitHub.  
 > Extensions (memoire, Lyla, HTTP/SSE) : roadmap, pas urgent.
 
 ---
 
-## Etat present : v0.4.2 (livre mai 2026, stable juillet 2026)
+## Etat present : v0.5.0 (aout 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -13,8 +13,14 @@
 | v0.3.0 | git×4 | ✅ |
 | v0.4.0 | 6 APIs cloud (meteo, heure, IP, devises, feries, dictionnaire) | ✅ |
 | v0.4.2 | +6 APIs (geocoding, sunrise, news, translate, random-fact, NASA APOD) | ✅ |
+| v0.5.0 | outils **web** : `fetch-url-v1`, `web-search-ddg-v1`, `wikipedia-search-v1` + garde anti-SSRF | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
+
+**Avance sur le plan initial :** le lot web etait prevu en v0.6.0 et la memoire partagee
+en v0.5.0. C'est le lot web qui a ete livre en premier (besoin reel de Karen / Sharon),
+donc il porte le numero 0.5.0. La memoire partagee garde son contenu, decalee ci-dessous.
+Decision et regles de securite : ADR-0005 (hub Iris-MCP) et [securite-web.md](securite-web.md).
 
 ---
 
@@ -26,13 +32,17 @@ Les sections ci-dessous decrivent la **vision** Sharon (mai 2026). Dates indicat
 
 Largement **deja livre** en v0.4.2 (geocoding, sunrise, news, translate, random-fact, nasa-apod).
 
-### v0.5.0 — Memoire partagee locale
+### Memoire partagee locale (ex v0.5.0, a replanifier)
 
 `memory-write-v1`, `memory-read-v1`, `memory-search-v1` (JSON V1, extensible Qdrant).
+Non livre : le numero 0.5.0 a ete pris par le lot web.
 
-### v0.6.0 — Recherche web gratuite
+### ~~v0.6.0 — Recherche web gratuite~~ : **livre en v0.5.0**
 
-`web-search-ddg-v1`, `wikipedia-search-v1`, `fetch-url-v1`.
+`web-search-ddg-v1`, `wikipedia-search-v1`, `fetch-url-v1` : livres le 2026-08-07.
+Reste ouvert sur ce theme (non engage) : recherche web indexee avec cle (Brave Search
+API, `BRAVE_API_KEY` commente dans `.env.example`), l'Instant Answer de DuckDuckGo ne
+couvrant pas tout le web.
 
 ### v0.7.0 — Surveillance ecosysteme
 
@@ -55,7 +65,7 @@ Largement **deja livre** en v0.4.2 (geocoding, sunrise, news, translate, random-
 
 ---
 
-## Securite (etat reel v0.4.2)
+## Securite (etat reel v0.5.0)
 
 iris-mcp-server suit les bonnes pratiques MCP quand c'est applicable en **mode lab local** :
 
@@ -64,6 +74,7 @@ iris-mcp-server suit les bonnes pratiques MCP quand c'est applicable en **mode l
 | Validation inputs | Zod sur chaque outil |
 | Filesystem | Sandbox `ALLOWED_ROOTS`, anti path-traversal |
 | Reseau runtime | Ollama localhost + **appels HTTP sortants** vers APIs cloud listees (meteo, news, NASA, etc.) |
+| URL fournies par le client | Garde anti-SSRF (`url-guard.ts`) : https only, hotes locaux / IP privees / metadonnees cloud refuses, DNS revalide, redirections limitees a 3, plafonds taille et timeout. Voir [securite-web.md](securite-web.md) |
 | Secrets | Pas de token perso dans le code ; `.env` local ; NASA utilise **DEMO_KEY** publique (limite 30 req/h) |
 | Git write | `git-commit-v1` limite aux repos sous `ALLOWED_ROOTS` |
 
@@ -94,4 +105,4 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 ---
 
-*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2).*
+*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2) · MAJ lot web v0.5.0 : 2026-08-07 Claude Code.*

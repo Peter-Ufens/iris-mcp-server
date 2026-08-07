@@ -37,6 +37,12 @@ describe('html-text', () => {
     expect(htmlToText('<script>var a = 1;<p>texte')).toContain('texte');
   });
 
+  it('nettoie une balise coupee en fin de contenu tronque', () => {
+    const text = htmlToText('<p>Debut de page</p><a href="https://exemple.or');
+    expect(text).toBe('Debut de page');
+    expect(text).not.toContain('<a');
+  });
+
   it('isHtmlContentType', () => {
     expect(isHtmlContentType('text/html; charset=utf-8')).toBe(true);
     expect(isHtmlContentType('application/xhtml+xml')).toBe(true);
