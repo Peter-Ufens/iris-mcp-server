@@ -64,7 +64,9 @@ export function htmlToText(html: string): string {
       .replace(/<(script|style|noscript|template|svg|iframe)\b[^>]*>/gi, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|li|tr|h[1-6]|section|article|header|footer|nav|blockquote|pre|table)\s*>/gi, '\n')
-      .replace(/<[^>]*>/g, ' '),
+      .replace(/<[^>]*>/g, ' ')
+      // Corps tronque : une balise ouverte non fermee peut trainer en fin de texte.
+      .replace(/<[^>]*$/, ' '),
   )
     .replace(/\r\n?/g, '\n')
     .replace(/[^\S\n]+/g, ' ')
