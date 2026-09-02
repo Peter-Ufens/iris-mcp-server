@@ -90,6 +90,12 @@ Lot Securite dedie (auth, rate-limit, audit logs, durcissement `ollama-list` end
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
+### Complement CLI (parké, hub 2026-09-02)
+
+CLI mince **optionnel** (ping, list-tools, debug) reutilisant les modules `src/`,
+sans refaire les 24 outils en commandes. MCP reste le canal principal pour les clients IA.
+Detail : hub `planning/backlog-cli-iris-2026-09-02.md` (projet Iris-MCP **`cloture`**).
+
 ## Hors scope (projets separes)
 
 - **n8n / Nora** : orchestration (appelle Iris)
