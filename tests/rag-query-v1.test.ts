@@ -17,13 +17,19 @@ function writePatterns(obj: unknown, withBom = false): string {
   return file;
 }
 
+/** Fixtures fictives (aucun nom de zone reelle du vault). */
 const PATTERNS = {
-  version: '2026-09-02b',
-  ragQueryExcludeContains: ['from-microsoft-copilot', 'lana-amante', 'profil-peter\\journal', '03-Vie'],
-  ragAlwaysExcludeContains: ['lana-amante', 'profil-peter\\journal', '03-Vie'],
+  version: 'test-2026-09-02',
+  ragQueryExcludeContains: [
+    'from-vendor-copilot',
+    'zone-alpha-sensitive',
+    'user-profile\\journal',
+    'private-life-zone',
+  ],
+  ragAlwaysExcludeContains: ['zone-alpha-sensitive', 'user-profile\\journal', 'private-life-zone'],
 };
 
-const V = 'D:\\Obsidian\\Obsidian\\Peter-Vault-Local\\';
+const V = 'D:\\Vault\\Example\\';
 
 function qdrantPayload(paths: string[]) {
   return {
@@ -52,49 +58,67 @@ describe('rag-query-v1 / zone patterns', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    delete process.env.ZONE_A_PATTERNS_FILE;
   });
 
   it('lit la source unique zone-a-patterns.json', () => {
     const p = loadZonePatterns(writePatterns(PATTERNS));
-    expect(p.version).toBe('2026-09-02b');
-    expect(p.queryExclude).toContain('from-microsoft-copilot');
-    expect(p.alwaysExclude).toContain('lana-amante');
+    expect(p.version).toBe('test-2026-09-02');
+    expect(p.queryExclude).toContain('from-vendor-copilot');
+    expect(p.alwaysExclude).toContain('zone-alpha-sensitive');
     expect(p.error).toBeUndefined();
   });
 
   it('supporte un BOM UTF-8 (fichier ecrit par PowerShell)', () => {
     const p = loadZonePatterns(writePatterns(PATTERNS, true));
-    expect(p.version).toBe('2026-09-02b');
+    expect(p.version).toBe('test-2026-09-02');
     expect(p.error).toBeUndefined();
   });
 
-  it('config illisible => se ferme au lieu de s ouvrir', () => {
+  it('config illisible => fail-closed generique', () => {
     const p = loadZonePatterns(join(tmpdir(), 'nexiste-pas-du-tout.json'));
     expect(p.error).toBeTruthy();
-    expect(p.alwaysExclude).toContain('lana-amante');
-    // le repli doit AUSSI fermer la query par defaut, pas seulement l intime
-    expect(p.queryExclude).toContain('lana-amante');
+    expect(p.alwaysExclude).toContain('conversations/');
+    expect(p.queryExclude).toContain('_prive');
+    expect(p.alwaysExclude).not.toContain('zone-alpha-sensitive');
   });
 
-  it('fichier sans ragAlwaysExcludeContains => repli de secours sur l intime', () => {
-    const p = loadZonePatterns(writePatterns({ version: 'vieux', ragQueryExcludeContains: ['03-Vie'] }));
-    expect(p.alwaysExclude).toContain('lana-amante');
-    expect(p.alwaysExclude).toContain('personnes.md');
+  it('sans ZONE_A_PATTERNS_FILE => fail-closed generique', () => {
+    const p = loadZonePatterns();
+    expect(p.version).toBe('env-missing');
+    expect(p.alwaysExclude).toContain('conversations\\');
+    expect(p.error).toContain('ZONE_A_PATTERNS_FILE');
+  });
+
+  it('fichier sans ragAlwaysExcludeContains => repli fail-closed', () => {
+    const p = loadZonePatterns(
+      writePatterns({ version: 'vieux', ragQueryExcludeContains: ['private-life-zone'] }),
+    );
+    expect(p.alwaysExclude).toContain('conversations/');
+    expect(p.alwaysExclude).not.toContain('zone-alpha-sensitive');
   });
 
   it('isPathExcluded : contains, insensible casse et separateur', () => {
-    expect(isPathExcluded(`${V}conversations/from-ollama-desktop/by-model/lana-amante/x.md`, ['lana-amante'])).toBe(true);
-    expect(isPathExcluded(`${V}00-Meta\\profil-peter\\journal\\2026-08-03.md`, ['profil-peter/journal'])).toBe(true);
-    expect(isPathExcluded(`${V}02-Projets\\Virtualisation-HyperV.md`, ['lana-amante', '03-Vie'])).toBe(false);
+    expect(
+      isPathExcluded(`${V}conversations/from-vendor/by-model/zone-alpha-sensitive/x.md`, [
+        'zone-alpha-sensitive',
+      ]),
+    ).toBe(true);
+    expect(
+      isPathExcluded(`${V}00-Meta\\user-profile\\journal\\2026-08-03.md`, ['user-profile/journal']),
+    ).toBe(true);
+    expect(
+      isPathExcluded(`${V}02-Projets\\Example.md`, ['zone-alpha-sensitive', 'private-life-zone']),
+    ).toBe(false);
     expect(isPathExcluded('', ['x'])).toBe(true);
   });
 
-  it('resolveExcludes : includeZoneA bascule sur la liste intime, pas sur une liste vide', () => {
+  it('resolveExcludes : includeZoneA bascule sur la liste sensible, pas sur une liste vide', () => {
     const p = loadZonePatterns(writePatterns(PATTERNS));
-    expect(resolveExcludes(p, false)).toContain('from-microsoft-copilot');
+    expect(resolveExcludes(p, false)).toContain('from-vendor-copilot');
     const opened = resolveExcludes(p, true);
-    expect(opened).not.toContain('from-microsoft-copilot');
-    expect(opened).toContain('lana-amante');
+    expect(opened).not.toContain('from-vendor-copilot');
+    expect(opened).toContain('zone-alpha-sensitive');
     expect(opened.length).toBeGreaterThan(0);
   });
 });
@@ -107,44 +131,43 @@ describe('rag-query-v1 / requete', () => {
 
   it('filtre les conversations brutes par defaut', async () => {
     stubFetch([
-      `${V}conversations\\from-microsoft-copilot\\Test_de_Fonctionnement.md`,
-      `${V}02-Projets\\Virtualisation-HyperV.md`,
+      `${V}conversations\\from-vendor-copilot\\Test.md`,
+      `${V}02-Projets\\Example-HyperV.md`,
     ]);
     const r = await ragQuery({ query: 'hyper-v', patternsFile: writePatterns(PATTERNS) });
     expect(r.meta.filterZoneA).toBe(true);
     expect(r.hits).toHaveLength(1);
-    expect(r.hits[0]!.sourceFile).toContain('Virtualisation-HyperV.md');
+    expect(r.hits[0]!.sourceFile).toContain('Example-HyperV.md');
   });
 
   it('includeZoneA ouvre Copilot', async () => {
     stubFetch([
-      `${V}conversations\\from-microsoft-copilot\\Test_de_Fonctionnement.md`,
-      `${V}02-Projets\\Virtualisation-HyperV.md`,
+      `${V}conversations\\from-vendor-copilot\\Test.md`,
+      `${V}02-Projets\\Example-HyperV.md`,
     ]);
     const r = await ragQuery({ query: 'hyper-v', includeZoneA: true, patternsFile: writePatterns(PATTERNS) });
     expect(r.meta.filterZoneA).toBe(false);
-    expect(r.hits.map((h) => h.sourceFile).join('|')).toContain('from-microsoft-copilot');
+    expect(r.hits.map((h) => h.sourceFile).join('|')).toContain('from-vendor-copilot');
   });
 
-  it('GARDE-FOU : includeZoneA n ouvre JAMAIS la zone intime', async () => {
+  it('GARDE-FOU : includeZoneA n ouvre JAMAIS la zone sensible', async () => {
     stubFetch([
-      `${V}conversations\\from-ollama-desktop\\by-model\\lana-amante\\intime.md`,
-      `${V}00-Meta\\profil-peter\\journal\\2026-08-03.md`,
-      `${V}03-Vie\\sante.md`,
-      `${V}conversations\\from-microsoft-copilot\\Test_de_Fonctionnement.md`,
+      `${V}conversations\\from-vendor\\zone-alpha-sensitive\\secret.md`,
+      `${V}00-Meta\\user-profile\\journal\\2026-08-03.md`,
+      `${V}private-life-zone\\note.md`,
+      `${V}conversations\\from-vendor-copilot\\Test.md`,
     ]);
     const r = await ragQuery({ query: 'peu importe', includeZoneA: true, patternsFile: writePatterns(PATTERNS) });
     const joined = r.hits.map((h) => h.sourceFile).join('|');
-    expect(joined).not.toContain('lana-amante');
+    expect(joined).not.toContain('zone-alpha-sensitive');
     expect(joined).not.toContain('journal');
-    expect(joined).not.toContain('03-Vie');
-    expect(joined).toContain('from-microsoft-copilot');
+    expect(joined).not.toContain('private-life-zone');
+    expect(joined).toContain('from-vendor-copilot');
     expect(r.meta.intimeAlwaysFiltered).toBe(true);
   });
 
-  it('GARDE-FOU : intime filtre meme si Qdrant ignore le filtre serveur', async () => {
-    // Qdrant renvoie de l intime malgre le must_not => le filet post-requete doit tenir.
-    stubFetch([`${V}conversations\\from-ollama-desktop\\by-model\\lana-amante\\fuite.md`]);
+  it('GARDE-FOU : zone sensible filtree meme si Qdrant ignore le filtre serveur', async () => {
+    stubFetch([`${V}conversations\\from-vendor\\zone-alpha-sensitive\\fuite.md`]);
     const r = await ragQuery({ query: 'x', includeZoneA: true, patternsFile: writePatterns(PATTERNS) });
     expect(r.hits).toHaveLength(0);
   });
@@ -159,14 +182,14 @@ describe('rag-query-v1 / requete', () => {
   });
 
   it('project et sourceContains filtrent les chemins', async () => {
-    stubFetch([`${V}02-Projets\\Virtualisation-HyperV.md`, `${V}02-Projets\\Gaming.md`]);
+    stubFetch([`${V}02-Projets\\Example-HyperV.md`, `${V}02-Projets\\Gaming.md`]);
     const r = await ragQuery({
       query: 'x',
-      project: 'Virtualisation-HyperV',
+      project: 'Example-HyperV',
       patternsFile: writePatterns(PATTERNS),
     });
     expect(r.hits).toHaveLength(1);
-    expect(r.hits[0]!.sourceFile).toContain('Virtualisation-HyperV');
+    expect(r.hits[0]!.sourceFile).toContain('Example-HyperV');
   });
 
   it('respecte limit', async () => {

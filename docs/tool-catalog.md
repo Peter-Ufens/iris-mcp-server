@@ -30,13 +30,13 @@ Ajoute en phase 2 RAG (2026-09-02).
 
 **Gouvernance Zone A - non negociable.** Par defaut les conversations brutes sont
 exclues. `includeZoneA: true` ouvre les conversations brutes (Copilot, Ollama, Claude)
-mais **jamais** la zone intime (`lana-amante`, journal, `personnes.md`, `03-Vie`,
-`10-Prive`). Les motifs viennent d'une source unique,
-`Vault-Obsidian/planning/config/zone-a-patterns.json`, jamais dupliquee ici.
-Ouvrir l'intime reste un geste manuel de Peter via
+mais **jamais** la zone sensible A-2 (liste complete dans le depot prive
+`iris-mcp-server-private`, fichier `zone-a-patterns.json`).
+Les motifs sont charges via la variable d'environnement `ZONE_A_PATTERNS_FILE`.
+Ouvrir la zone sensible reste un geste manuel de Peter via
 `query-rag.ps1 -IncludeZoneA -AllowIntime`.
 
-Details : `D:\IA-CURSOR\RAG\docs\mcp-rag-query.md` (hub RAG).
+Details ops : depot prive `iris-mcp-server-private` · hub RAG local.
 
 ## filesystem (2)
 

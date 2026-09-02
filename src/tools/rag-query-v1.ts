@@ -13,34 +13,24 @@ import type { IrisTool } from './_types.js';
  *   - par defaut          : Zone A filtree (conversations brutes + intime exclus)
  *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT
  *   - Zone A-2 "intime"   : JAMAIS ouverte par cet outil, quel que soit l'input.
- *     (lana-amante, 00-Meta/profil-peter/journal, personnes.md, 03-Vie, 10-Prive...)
  *     L'ouverture de l'intime reste un geste manuel et explicite de Peter :
  *     `query-rag.ps1 -IncludeZoneA -AllowIntime`.
  *
  * Les motifs ne sont PAS dupliques ici : source unique = zone-a-patterns.json
- * (le meme fichier que lisent query-rag.ps1, l'ingest et le backup GitHub).
+ * (charge via ZONE_A_PATTERNS_FILE ; voir depot prive iris-mcp-server-private).
  */
 
 const DEFAULT_QDRANT = 'http://127.0.0.1:6334';
 const DEFAULT_OLLAMA = 'http://127.0.0.1:11434';
 const DEFAULT_COLLECTION = 'vault-text';
 const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
-const DEFAULT_PATTERNS_FILE =
-  'D:\\IA-CURSOR\\Vault-Obsidian\\planning\\config\\zone-a-patterns.json';
 
-/** Filet de securite si zone-a-patterns.json est illisible : on ferme, on n'ouvre pas. */
-const FALLBACK_ALWAYS_EXCLUDE = [
-  '03-Vie',
-  '10-Prive',
-  '_prive',
-  'lana-amante',
-  'profil-peter\\journal',
-  'profil-peter/journal',
-  'personnes.md',
-  'personnes-enrichissement',
-  '_ip-hors-gh',
-  'lyla-heritage-ip',
-];
+/**
+ * Repli public minimal si zone-a-patterns.json est illisible : on ferme large
+ * (conversations brutes + dossiers _prive generiques) sans nommer de zones
+ * personnelles dans le code source public.
+ */
+const FALLBACK_FAIL_CLOSED = ['conversations\\', 'conversations/', '_prive', '_prive\\', '_prive/'];
 
 export interface ZonePatterns {
   version: string;
@@ -69,10 +59,20 @@ export interface RagQueryResult {
   };
 }
 
-export function loadZonePatterns(file = resolvePatternsFile()): ZonePatterns {
+export function loadZonePatterns(file?: string | null): ZonePatterns {
+  const path = file ?? resolvePatternsFile();
+  if (!path) {
+    return {
+      version: 'env-missing',
+      queryExclude: FALLBACK_FAIL_CLOSED,
+      alwaysExclude: FALLBACK_FAIL_CLOSED,
+      error:
+        'ZONE_A_PATTERNS_FILE non defini - repli fail-closed. Voir iris-mcp-server-private.',
+    };
+  }
   try {
     // utf-8-sig : le fichier peut porter un BOM (ecrit par PowerShell).
-    const raw = readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
+    const raw = readFileSync(path, 'utf8').replace(/^\uFEFF/, '');
     const j = JSON.parse(raw) as {
       version?: string;
       ragQueryExcludeContains?: string[];
@@ -81,7 +81,7 @@ export function loadZonePatterns(file = resolvePatternsFile()): ZonePatterns {
     const always =
       Array.isArray(j.ragAlwaysExcludeContains) && j.ragAlwaysExcludeContains.length > 0
         ? j.ragAlwaysExcludeContains
-        : FALLBACK_ALWAYS_EXCLUDE;
+        : FALLBACK_FAIL_CLOSED;
     return {
       version: j.version ?? 'unknown',
       queryExclude: Array.isArray(j.ragQueryExcludeContains) ? j.ragQueryExcludeContains : [],
@@ -92,16 +92,17 @@ export function loadZonePatterns(file = resolvePatternsFile()): ZonePatterns {
     // Config illisible => on reste ferme sur l'intime ET sur les conversations brutes.
     return {
       version: 'unreadable',
-      queryExclude: FALLBACK_ALWAYS_EXCLUDE,
-      alwaysExclude: FALLBACK_ALWAYS_EXCLUDE,
-      error: `zone-a-patterns illisible (${msg}) - repli sur la liste de secours`,
+      queryExclude: FALLBACK_FAIL_CLOSED,
+      alwaysExclude: FALLBACK_FAIL_CLOSED,
+      error: `zone-a-patterns illisible (${msg}) - repli fail-closed (conversations + _prive)`,
     };
   }
 }
 
-export function resolvePatternsFile(): string {
+export function resolvePatternsFile(): string | null {
   const fromEnv = process.env.ZONE_A_PATTERNS_FILE?.trim();
-  return fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_PATTERNS_FILE;
+  if (fromEnv && fromEnv.length > 0) return fromEnv;
+  return null;
 }
 
 /** Meme semantique que Test-RagSourcePathExcluded (PowerShell) : contains, insensible a la casse, / == \. */
