@@ -1,6 +1,6 @@
 # Catalogue des outils MCP - iris-mcp-server v0.5.0
 
-24 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
+25 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 ## iris (1)
@@ -15,6 +15,28 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 |---|---|---|
 | `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`) |
 | `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat`) |
+
+## memory (1)
+
+Ajoute en phase 2 RAG (2026-09-02).
+
+| ID | Fichier | Description |
+|---|---|---|
+| `rag-query-v1` | `rag-query-v1.ts` | Interroge le RAG vault (Qdrant `:6334` + embeddings Ollama) |
+
+| Outil | Entrees | Sorties |
+|---|---|---|
+| `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `count`, `collection`, `error?`) |
+
+**Gouvernance Zone A - non negociable.** Par defaut les conversations brutes sont
+exclues. `includeZoneA: true` ouvre les conversations brutes (Copilot, Ollama, Claude)
+mais **jamais** la zone intime (`lana-amante`, journal, `personnes.md`, `03-Vie`,
+`10-Prive`). Les motifs viennent d'une source unique,
+`Vault-Obsidian/planning/config/zone-a-patterns.json`, jamais dupliquee ici.
+Ouvrir l'intime reste un geste manuel de Peter via
+`query-rag.ps1 -IncludeZoneA -AllowIntime`.
+
+Details : `D:\IA-CURSOR\RAG\docs\mcp-rag-query.md` (hub RAG).
 
 ## filesystem (2)
 
