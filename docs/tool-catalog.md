@@ -1,6 +1,6 @@
-# Catalogue des outils MCP - iris-mcp-server v0.5.0
+# Catalogue des outils MCP - iris-mcp-server v0.6.0
 
-25 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
+26 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 ## iris (1)
@@ -16,17 +16,49 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 | `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`) |
 | `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat`) |
 
-## memory (1)
+## memory (2)
 
-Ajoute en phase 2 RAG (2026-09-02).
+`rag-query-v1` ajoute en phase 2 RAG (2026-09-02), poids doux et dedoublonnage (2026-09-13).
+`rag-search-v2` ajoute au lot D (2026-09-13), a cote de v1 qui reste inchange.
 
 | ID | Fichier | Description |
 |---|---|---|
-| `rag-query-v1` | `rag-query-v1.ts` | Interroge le RAG vault (Qdrant `:6334` + embeddings Ollama) |
+| `rag-query-v1` | `rag-query-v1.ts` | Interroge le RAG vault (Qdrant `:6334` + embeddings Ollama), rapide, mot-cle ou question simple |
+| `rag-search-v2` | `rag-search-v2.ts` | Recherche qui comprend le vocabulaire de l'utilisateur (glossaire prive, dictee), plusieurs formulations fusionnees, demande un contexte si rien ne repond |
 
 | Outil | Entrees | Sorties |
 |---|---|---|
-| `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `count`, `collection`, `error?`) |
+| `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score` pondere, `score_raw`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `sourcePriorityApplied`, `dedupByFilename`, `count`, `collection`, `error?`) |
+| `rag-search-v2` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `reformulate` (defaut true) | `hits[]` (`score` fusionne, `score_raw`, `sourceFile`, `source_filename`, `excerpt`, `trouvePar`), `meta` (memes champs de zone que v1 + `glossary`, `glossaire`, `intentions`, `questionNettoyee`, `variantes`, `notesPointees`, `reformulations`, `reformulationCount`, `reformulationNote`, `fallback`, `fusion`, `confiance`, `needsClarification`, `clarification`, `timingsMs`) |
+
+### rag-search-v2 : fonctionnement
+
+1. La question est nettoyee (tics de langage, smileys) puis comparee au **glossaire prive**.
+2. Variantes cherchees : question nettoyee, question + termes du glossaire, jusqu'a 3 reformulations
+   d'un modele local (`think: false`, temperature 0, sortie JSON), et une recherche ciblee dans
+   les notes que le glossaire designe.
+3. Fusion RRF (k = 60) puis poids doux de zone, dedoublonnage identique a v1.
+4. **Confiance** : un extrait « repond » s'il porte les termes de la question (terme du glossaire,
+   ou la moitie des termes dont le plus distinctif). Aucun seuil de score absolu. Sinon
+   `needsClarification: true` et `clarification.message` propose de preciser le projet,
+   la periode, ou de relancer avec `includeZoneA`. Le client ne doit pas inventer de reponse.
+5. `reformulationCount = 0` est toujours explique dans `reformulationNote` (glossaire absent,
+   reponse vide du modele, delai depasse). Un delai depasse est aussi signale dans `fallback`.
+
+### rag-search-v2 : variables d'environnement
+
+| Variable | Defaut | Role |
+|---|---|---|
+| `ZONE_A_PATTERNS_FILE` | aucun (fail-closed) | motifs de zone, comme v1 |
+| `RAG_GLOSSARY_FILE` | `glossaire-recherche.md` voisin de `ZONE_A_PATTERNS_FILE` | glossaire prive (**jamais** dans ce depot) |
+| `RAG_REFORMULATE_MODEL` | `qwen3.5:9b` | modele Ollama des reformulations |
+| `RAG_REFORMULATE_TIMEOUT_MS` | `6000` | au-dela, repli sans reformulation (signale dans `meta.fallback`) |
+| `RAG_PINNED_RANK` | `8` | poids d'une note designee par le glossaire (rang equivalent dans chaque variante) |
+| `QDRANT_URL`, `OLLAMA_BASE_URL`, `QDRANT_COLLECTION`, `RAG_EMBED_MODEL` | comme v1 | services |
+
+Format du glossaire : tableaux Markdown `Tu dis | Terme | Ou chercher | Preuve | Statut`,
+tableau `Forme | Pourquoi` pour les pieges (jamais de reecriture automatique), section tics.
+Les lignes « a valider » servent d'indice au modele mais ne reecrivent jamais la question.
 
 **Gouvernance Zone A - non negociable.** Par defaut les conversations brutes sont
 exclues. `includeZoneA: true` ouvre les conversations brutes (Copilot, Ollama, Claude)
