@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.5.0` · **24 outils** · **205 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.6.0` · **26 outils** · **247 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -17,16 +17,17 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 - Produit Iris : [Iris-MCP : brancher les IA sur des outils reels](https://gamma.app/docs/Iris-MCP-brancher-les-IA-sur-des-outils-reels-rzpbly9kqpju074)
 - Concept MCP (voisin) : [MCP explique simplement](https://gamma.app/docs/MCP-explique-simplement-zdk7hi92hsxsnn1)
 
-**Ce qui fonctionne aujourd'hui (aout 2026)**
+**Ce qui fonctionne aujourd'hui (septembre 2026)**
 
 | Element | Etat |
 |---|---|
-| 24 outils MCP operationnels | OK, testes (Vitest 205/205) |
+| 26 outils MCP operationnels | OK, testes (Vitest 247/247) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 12 APIs cloud sans compte perso | OK (meteo, heure, news, traduction, NASA APOD, etc.) |
 | Outils web (fetch URL, recherche, Wikipedia) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) |
+| RAG vault (`rag-query-v1` + `rag-search-v2`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
 | Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
 | Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
 
@@ -61,7 +62,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.5.0 - 24)
+## Outils disponibles (v0.6.0 - 26)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -89,6 +90,8 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `fetch-url-v1` | web | Contenu texte d'une URL https (garde SSRF, plafonds) |
 | `web-search-ddg-v1` | web | Recherche DuckDuckGo Instant Answer (sans cle) |
 | `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
+| `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
+| `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
 
 Detail : [docs/tool-catalog.md](docs/tool-catalog.md).
 
@@ -103,7 +106,7 @@ iris-mcp-server/
 │   ├── tools/
 │   │   ├── _types.ts         # Interface IrisTool
 │   │   ├── _registry.ts      # Auto-decouverte
-│   │   └── *-v1.ts           # 24 outils
+│   │   └── *-v*.ts           # 26 outils (v1 + rag-search-v2)
 │   └── utils/
 │       ├── env.ts
 │       ├── path-guard.ts     # ALLOWED_ROOTS, anti traversal
@@ -111,7 +114,7 @@ iris-mcp-server/
 │       ├── url-guard.ts      # Garde anti-SSRF des URL client
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       └── html-text.ts      # HTML vers texte
-├── tests/                    # Vitest (205 tests)
+├── tests/                    # Vitest (247 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json
