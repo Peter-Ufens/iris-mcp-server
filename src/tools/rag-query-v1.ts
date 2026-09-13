@@ -36,11 +36,13 @@ export interface ZonePatterns {
   version: string;
   queryExclude: string[];
   alwaysExclude: string[];
+  sourcePriority: Record<string, number>;
   error?: string;
 }
 
 export interface RagHit {
   score: number;
+  score_raw?: number;
   sourceFile: string;
   source_filename: string;
   excerpt: string;
@@ -53,6 +55,8 @@ export interface RagQueryResult {
     intimeAlwaysFiltered: true;
     zonePatternsVersion: string;
     excludePatterns: number;
+    sourcePriorityApplied: boolean;
+    dedupByFilename: boolean;
     count: number;
     collection: string;
     error?: string;
@@ -66,6 +70,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version: 'env-missing',
       queryExclude: FALLBACK_FAIL_CLOSED,
       alwaysExclude: FALLBACK_FAIL_CLOSED,
+      sourcePriority: {},
       error:
         'ZONE_A_PATTERNS_FILE non defini - repli fail-closed. Voir iris-mcp-server-private.',
     };
@@ -77,15 +82,19 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version?: string;
       ragQueryExcludeContains?: string[];
       ragAlwaysExcludeContains?: string[];
+      ragSourcePriority?: Record<string, number>;
     };
     const always =
       Array.isArray(j.ragAlwaysExcludeContains) && j.ragAlwaysExcludeContains.length > 0
         ? j.ragAlwaysExcludeContains
         : FALLBACK_FAIL_CLOSED;
+    const sourcePriority =
+      j.ragSourcePriority && typeof j.ragSourcePriority === 'object' ? j.ragSourcePriority : {};
     return {
       version: j.version ?? 'unknown',
       queryExclude: Array.isArray(j.ragQueryExcludeContains) ? j.ragQueryExcludeContains : [],
       alwaysExclude: always,
+      sourcePriority,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -94,6 +103,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version: 'unreadable',
       queryExclude: FALLBACK_FAIL_CLOSED,
       alwaysExclude: FALLBACK_FAIL_CLOSED,
+      sourcePriority: {},
       error: `zone-a-patterns illisible (${msg}) - repli fail-closed (conversations + _prive)`,
     };
   }
@@ -118,6 +128,74 @@ export function isPathExcluded(sourcePath: string, excludeContains: string[]): b
 /** Motifs a exclure pour cette requete. includeZoneA n'ouvre jamais A-2. */
 export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean): string[] {
   return includeZoneA ? patterns.alwaysExclude : patterns.queryExclude;
+}
+
+/** Poids doux Lot B : premier motif chemin qui matche (ordre JSON). Defaut 1.0. */
+export function sourceWeight(sourcePath: string, priority: Record<string, number>): number {
+  if (!sourcePath || !priority || Object.keys(priority).length === 0) return 1;
+  const norm = sourcePath.replace(/\//g, '\\').toLowerCase();
+  for (const [pat, w] of Object.entries(priority)) {
+    if (!pat) continue;
+    const p = pat.replace(/\//g, '\\').toLowerCase();
+    if (norm.includes(p)) return Number(w) || 1;
+  }
+  return 1;
+}
+
+/**
+ * Cle de dedoublonnage.
+ * - Conversations : nom de fichier (UUID), car un meme transcript peut exister sous
+ *   plusieurs dossiers workspace (ex. `empty-window` et le vrai nom).
+ * - Notes : chemin complet normalise. Des notes distinctes partagent souvent le meme
+ *   nom (`README.md`, hub et noyau d'une meme fiche) et ne doivent pas s'ecraser.
+ */
+export function dedupKey(sourceFile: string, sourceFilename: string): string {
+  const norm = (sourceFile || '').replace(/\//g, '\\').toLowerCase();
+  if (norm.includes('\\conversations\\')) {
+    const name = (sourceFilename || sourceFile.split(/[/\\]/).pop() || sourceFile).trim();
+    return `conv:${name.toLowerCase()}`;
+  }
+  return `path:${norm || (sourceFilename || '').toLowerCase()}`;
+}
+
+/**
+ * Applique poids + dedup (conversations par nom, notes par chemin, copies exactes
+ * d'un meme passage), puis coupe a `limit`.
+ * Garde le hit au meilleur score pondere pour chaque cle.
+ */
+export function rankHitsWithPriority(
+  hits: Array<{ score: number; sourceFile: string; source_filename: string; excerpt: string }>,
+  priority: Record<string, number>,
+  limit: number,
+): RagHit[] {
+  const weighted: RagHit[] = hits.map((h) => {
+    const raw = Number(h.score ?? 0);
+    const w = sourceWeight(h.sourceFile, priority);
+    const score = Math.round(raw * w * 10_000) / 10_000;
+    return {
+      score,
+      score_raw: Math.round(raw * 10_000) / 10_000,
+      sourceFile: h.sourceFile,
+      source_filename: h.source_filename,
+      excerpt: h.excerpt,
+    };
+  });
+  weighted.sort((a, b) => b.score - a.score);
+  const seen = new Set<string>();
+  const seenText = new Set<string>();
+  const out: RagHit[] = [];
+  for (const h of weighted) {
+    const key = dedupKey(h.sourceFile, h.source_filename);
+    if (seen.has(key)) continue;
+    // Copie exacte du meme passage sous un autre chemin : un creneau gaspille.
+    const textKey = (h.excerpt || '').trim();
+    if (textKey.length >= 40 && seenText.has(textKey)) continue;
+    seen.add(key);
+    if (textKey.length >= 40) seenText.add(textKey);
+    out.push(h);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 async function postJson(url: string, body: unknown, timeoutMs: number): Promise<unknown> {
@@ -168,6 +246,8 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
       intimeAlwaysFiltered: true,
       zonePatternsVersion: patterns.version,
       excludePatterns: excludes.length,
+      sourcePriorityApplied: Object.keys(patterns.sourcePriority).length > 0,
+      dedupByFilename: true,
       count: 0,
       collection,
     },
@@ -195,11 +275,15 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
   }
 
   // 2) recherche Qdrant, filtre zone cote serveur
-  // Sur-echantillonnage : les filtres appliques apres (zone, projet, source) mangent des hits.
-  const needsOverfetch = excludes.length > 0 || Boolean(input.project) || Boolean(input.sourceContains);
+  // Sur-echantillonnage : filtres post + reclassement poids + dedup mangent des hits.
+  const needsOverfetch =
+    excludes.length > 0 ||
+    Boolean(input.project) ||
+    Boolean(input.sourceContains) ||
+    Object.keys(patterns.sourcePriority).length > 0;
   const searchBody: Record<string, unknown> = {
     vector,
-    limit: needsOverfetch ? Math.max(limit * 4, 20) : limit,
+    limit: needsOverfetch ? Math.max(limit * 8, 40) : limit,
     with_payload: true,
   };
   if (excludes.length > 0) {
@@ -222,7 +306,12 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
   }
 
   // 3) filet post-requete : on ne fait jamais confiance au seul filtre serveur
-  const hits: RagHit[] = [];
+  const candidates: Array<{
+    score: number;
+    sourceFile: string;
+    source_filename: string;
+    excerpt: string;
+  }> = [];
   for (const h of raw) {
     const sourceFile = String(h.payload?.sourceFile ?? '');
     if (isPathExcluded(sourceFile, excludes)) continue;
@@ -234,14 +323,16 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
       continue;
     }
     const text = String(h.payload?.text ?? '');
-    hits.push({
-      score: Math.round(Number(h.score ?? 0) * 10_000) / 10_000,
+    candidates.push({
+      score: Number(h.score ?? 0),
       sourceFile,
       source_filename: String(h.payload?.source_filename ?? ''),
       excerpt: text.length > 240 ? `${text.slice(0, 240)}...` : text,
     });
-    if (hits.length >= limit) break;
   }
+
+  // 4) Lot B : poids doux + dedup par nom de fichier (UUID)
+  const hits = rankHitsWithPriority(candidates, patterns.sourcePriority, limit);
 
   base.hits = hits;
   base.meta.count = hits.length;

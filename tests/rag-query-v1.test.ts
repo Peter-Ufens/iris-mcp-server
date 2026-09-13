@@ -178,7 +178,72 @@ describe('rag-query-v1 / requete', () => {
     await ragQuery({ query: 'x', limit: 5, patternsFile: writePatterns(PATTERNS) });
     const body = cap.body as { filter?: { must_not?: unknown[] }; limit?: number };
     expect(body.filter?.must_not).toHaveLength(PATTERNS.ragQueryExcludeContains.length);
-    expect(body.limit).toBe(20);
+    // Lot B : overfetch max(limit*8, 40) pour poids + dedup
+    expect(body.limit).toBe(40);
+  });
+
+  it('Lot B : poids doux privilegie 00-Meta vs conversations', async () => {
+    stubFetch([
+      `${V}conversations\\from-cursor-agents-md\\uuid-aaa.md`,
+      `${V}00-Meta\\Decision-Example.md`,
+    ]);
+    const prio = {
+      ...PATTERNS,
+      ragSourcePriority: { '\\00-Meta\\': 1.1, '\\conversations\\': 0.95 },
+    };
+    const r = await ragQuery({ query: 'x', patternsFile: writePatterns(prio) });
+    expect(r.meta.sourcePriorityApplied).toBe(true);
+    expect(r.hits[0]!.sourceFile).toContain('00-Meta');
+    expect(r.hits[0]!.score_raw).toBeDefined();
+  });
+
+  it('Lot B : dedup par nom de fichier (empty-window vs vrai workspace)', async () => {
+    stubFetch([
+      `${V}conversations\\empty-window\\agent-transcripts\\uuid-same\\uuid-same.md`,
+      `${V}conversations\\d-IA-CURSOR-Vault\\agent-transcripts\\uuid-same\\uuid-same.md`,
+      `${V}02-Projets\\Other.md`,
+    ]);
+    const r = await ragQuery({ query: 'x', limit: 5, patternsFile: writePatterns(PATTERNS) });
+    const names = r.hits.map((h) => h.source_filename);
+    expect(names.filter((n) => n === 'uuid-same.md')).toHaveLength(1);
+    expect(r.meta.dedupByFilename).toBe(true);
+  });
+
+  it('Lot B : deux notes distinctes de meme nom ne s ecrasent pas (README hub vs sous-dossier)', async () => {
+    stubFetch([
+      `${V}01-Hubs\\README.md`,
+      `${V}02-Projets\\Example\\README.md`,
+      `${V}00-Meta\\Fiche.md`,
+      `${V}00-Meta\\sous-dossier\\Fiche.md`,
+    ]);
+    const r = await ragQuery({ query: 'x', limit: 5, patternsFile: writePatterns(PATTERNS) });
+    expect(r.hits).toHaveLength(4);
+    expect(r.hits.filter((h) => h.source_filename === 'README.md')).toHaveLength(2);
+  });
+
+  it('Lot B : copie exacte du meme passage sous deux chemins => un seul creneau', async () => {
+    const same = 'passage strictement identique recopie dans deux notes differentes du vault';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/api/embeddings')) {
+          return { ok: true, json: async () => ({ embedding: [0.1, 0.2, 0.3] }) };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            result: [
+              { score: 0.9, payload: { sourceFile: `${V}04-Idees\\a\\Copie.md`, source_filename: 'Copie.md', text: same } },
+              { score: 0.89, payload: { sourceFile: `${V}04-Idees\\b\\Copie.md`, source_filename: 'Copie.md', text: same } },
+              { score: 0.8, payload: { sourceFile: `${V}02-Projets\\Autre.md`, source_filename: 'Autre.md', text: 'autre contenu sans rapport avec le premier passage cite' } },
+            ],
+          }),
+        };
+      }),
+    );
+    const r = await ragQuery({ query: 'x', limit: 5, patternsFile: writePatterns(PATTERNS) });
+    expect(r.hits).toHaveLength(2);
+    expect(r.hits.map((h) => h.source_filename)).toEqual(['Copie.md', 'Autre.md']);
   });
 
   it('project et sourceContains filtrent les chemins', async () => {
