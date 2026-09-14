@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.6.0` · **26 outils** · **247 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.7.0` · **27 outils** · **262 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -21,13 +21,13 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 26 outils MCP operationnels | OK, testes (Vitest 247/247) |
+| 27 outils MCP operationnels | OK, testes (Vitest 262/262) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 12 APIs cloud sans compte perso | OK (meteo, heure, news, traduction, NASA APOD, etc.) |
 | Outils web (fetch URL, recherche, Wikipedia) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) |
-| RAG vault (`rag-query-v1` + `rag-search-v2`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
+| RAG vault (`rag-query-v1` + `rag-search-v2` + `rag-hybrid-v1`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
 | Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
 | Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
 
@@ -62,7 +62,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.6.0 - 26)
+## Outils disponibles (v0.7.0 - 27)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -92,6 +92,7 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
 | `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
 | `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
+| `rag-hybrid-v1` | memory | RAG vectoriel + lexical : identifiants, noms de fichier, fautes de frappe |
 
 Detail : [docs/tool-catalog.md](docs/tool-catalog.md).
 
@@ -106,7 +107,7 @@ iris-mcp-server/
 │   ├── tools/
 │   │   ├── _types.ts         # Interface IrisTool
 │   │   ├── _registry.ts      # Auto-decouverte
-│   │   └── *-v*.ts           # 26 outils (v1 + rag-search-v2)
+│   │   └── *-v*.ts           # 27 outils (v1, rag-search-v2, rag-hybrid-v1)
 │   └── utils/
 │       ├── env.ts
 │       ├── path-guard.ts     # ALLOWED_ROOTS, anti traversal

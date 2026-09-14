@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { discoverTools, getRegisteredTools, getUptimeSeconds } from '../src/tools/_registry.js';
 
 describe('_registry', () => {
-  it('decouvre exactement 26 outils', async () => {
+  it('decouvre exactement 27 outils', async () => {
     const tools = await discoverTools();
-    expect(tools).toHaveLength(26);
+    expect(tools).toHaveLength(27);
   });
 
   it('chaque outil a un id, description, category, execute', async () => {
@@ -27,7 +27,7 @@ describe('_registry', () => {
   it('getRegisteredTools retourne les outils apres discover', async () => {
     await discoverTools();
     const tools = getRegisteredTools();
-    expect(tools.length).toBe(26);
+    expect(tools.length).toBe(27);
     expect(tools.map((t) => t.id)).toContain('iris-ping-v1');
   });
 
@@ -35,7 +35,7 @@ describe('_registry', () => {
     expect(getUptimeSeconds()).toBeGreaterThanOrEqual(0);
   });
 
-  it('contient les 26 outils attendus', async () => {
+  it('contient les 27 outils attendus', async () => {
     const tools = await discoverTools();
     const ids = tools.map((t) => t.id).sort();
     expect(ids).toEqual([
@@ -56,6 +56,7 @@ describe('_registry', () => {
       'news-v1',
       'ollama-chat-v1',
       'ollama-list-v1',
+      'rag-hybrid-v1',
       'rag-query-v1',
       'rag-search-v2',
       'random-fact-v1',
