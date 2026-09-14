@@ -1,6 +1,6 @@
-# Catalogue des outils MCP - iris-mcp-server v0.6.0
+# Catalogue des outils MCP - iris-mcp-server v0.7.0
 
-26 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
+27 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 ## iris (1)
@@ -16,20 +16,52 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 | `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`) |
 | `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat`) |
 
-## memory (2)
+## memory (3)
 
 `rag-query-v1` ajoute en phase 2 RAG (2026-09-02), poids doux et dedoublonnage (2026-09-13).
 `rag-search-v2` ajoute au lot D (2026-09-13), a cote de v1 qui reste inchange.
+`rag-hybrid-v1` ajoute au lot E (2026-09-14) : vectoriel de v1 + lexical sur l'index.
 
 | ID | Fichier | Description |
 |---|---|---|
 | `rag-query-v1` | `rag-query-v1.ts` | Interroge le RAG vault (Qdrant `:6334` + embeddings Ollama), rapide, mot-cle ou question simple |
 | `rag-search-v2` | `rag-search-v2.ts` | Recherche qui comprend le vocabulaire de l'utilisateur (glossaire prive, dictee), plusieurs formulations fusionnees, demande un contexte si rien ne repond |
+| `rag-hybrid-v1` | `rag-hybrid-v1.ts` | Recherche des termes exacts : identifiants, noms de fichier ou de variable, chemins partiels, noms propres rares, lettres voisines inversees |
 
 | Outil | Entrees | Sorties |
 |---|---|---|
 | `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score` pondere, `score_raw`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `sourcePriorityApplied`, `dedupByFilename`, `count`, `collection`, `error?`) |
 | `rag-search-v2` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `reformulate` (defaut true) | `hits[]` (`score` fusionne, `score_raw`, `sourceFile`, `source_filename`, `excerpt`, `trouvePar`), `meta` (memes champs de zone que v1 + `glossary`, `glossaire`, `intentions`, `questionNettoyee`, `variantes`, `notesPointees`, `reformulations`, `reformulationCount`, `reformulationNote`, `fallback`, `fusion`, `confiance`, `needsClarification`, `clarification`, `timingsMs`) |
+
+### Quel outil choisir
+
+| Besoin | Outil | Pourquoi |
+|---|---|---|
+| Question simple, mot-cle, reponse rapide | `rag-query-v1` | un seul appel vectoriel, le plus rapide |
+| Question dictee ou en langage naturel, vocabulaire de l'utilisateur | `rag-search-v2` | glossaire prive, reformulations, clarification si rien ne repond |
+| Identifiant, nom de fichier, variable, chemin partiel, nom propre rare, faute de frappe sur ces termes | `rag-hybrid-v1` | cherche le terme exact dans l'index en plus du vectoriel |
+
+`rag-hybrid-v1` ne traduit pas le vocabulaire : pour une dictee, `rag-search-v2` reste l'outil.
+
+### rag-hybrid-v1 : fonctionnement
+
+1. **Termes** : identifiants d'abord (chiffre, tiret, soulignement, point, majuscules), puis noms
+   propres, puis mots longs ; mots vides retires ; 6 termes au plus.
+2. **Canal vectoriel** : `rag-query-v1` tel quel (zones, poids doux, dedoublonnage).
+3. **Canal lexical** : filtre texte de Qdrant sur `text` et `sourceFile`, avec les **memes
+   exclusions de zone** que le vectoriel, re-appliquees cote client. Le filtre est sensible a la
+   casse : plusieurs casses sont essayees. Un terme introuvable tel quel est cherche avec ses
+   inversions de lettres voisines (`meta.termesLexicaux[].typo`). Un terme present dans plus de
+   60 documents est ignore (echantillon non representatif).
+4. **Fusion** : RRF k = 60. Rang vectoriel de v1 (poids deja inclus) + rang lexical x poids de
+   zone. Le lexical pese x1 si la question porte un identifiant, une faute rattrapee, ou tient en
+   1 ou 2 termes ; sinon x0,5 et un document doit porter au moins 2 termes distinctifs.
+5. **Limite** : le canal lexical ne voit que ce qui est indexe (un fichier tout neuf apparait apres
+   la prochaine indexation).
+
+| Outil | Entrees | Sorties |
+|---|---|---|
+| `rag-hybrid-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt` centre sur le terme, `trouvePar`, `rangVectoriel`, `rangLexical`, `termes`, `fauteDeFrappe`, `dansLeChemin`), `meta` (champs de zone de v1 + `termes`, `termesLexicaux`, `poidsLexical`, `fusion`, `conseil`, `timingsMs`) |
 
 ### rag-search-v2 : fonctionnement
 
