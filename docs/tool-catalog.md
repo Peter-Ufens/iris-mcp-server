@@ -1,4 +1,4 @@
-# Catalogue des outils MCP - iris-mcp-server v0.8.0
+# Catalogue des outils MCP - iris-mcp-server v0.9.0
 
 28 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
@@ -22,6 +22,7 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 `rag-search-v2` ajoute au lot D (2026-09-13), a cote de v1 qui reste inchange.
 `rag-hybrid-v1` ajoute au lot E (2026-09-14) : vectoriel de v1 + lexical sur l'index.
 `rag-journal-link-v1` et le journal opt-in des trois outils RAG ajoutes en v0.8.0 (2026-09-14) : voir [rag-journal.md](rag-journal.md).
+Zone contentieux et parametre `includeContentieux` sur les trois outils RAG ajoutes en v0.9.0 (2026-09-14) : voir la gouvernance plus bas.
 
 | ID | Fichier | Description |
 |---|---|---|
@@ -32,8 +33,8 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 | Outil | Entrees | Sorties |
 |---|---|---|
-| `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score` pondere, `score_raw`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `sourcePriorityApplied`, `dedupByFilename`, `count`, `collection`, `error?`) |
-| `rag-search-v2` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `reformulate` (defaut true) | `hits[]` (`score` fusionne, `score_raw`, `sourceFile`, `source_filename`, `excerpt`, `trouvePar`), `meta` (memes champs de zone que v1 + `glossary`, `glossaire`, `intentions`, `questionNettoyee`, `variantes`, `notesPointees`, `reformulations`, `reformulationCount`, `reformulationNote`, `fallback`, `fusion`, `confiance`, `needsClarification`, `clarification`, `timingsMs`) |
+| `rag-query-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `includeContentieux` (defaut false) | `hits[]` (`score` pondere, `score_raw`, `sourceFile`, `source_filename`, `excerpt`), `meta` (`filterZoneA`, `filterContentieux`, `intimeAlwaysFiltered`, `zonePatternsVersion`, `excludePatterns`, `sourcePriorityApplied`, `dedupByFilename`, `count`, `collection`, `error?`) |
+| `rag-search-v2` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `includeContentieux` (defaut false), `reformulate` (defaut true) | `hits[]` (`score` fusionne, `score_raw`, `sourceFile`, `source_filename`, `excerpt`, `trouvePar`), `meta` (memes champs de zone que v1 + `glossary`, `glossaire`, `intentions`, `questionNettoyee`, `variantes`, `notesPointees`, `reformulations`, `reformulationCount`, `reformulationNote`, `fallback`, `fusion`, `confiance`, `needsClarification`, `clarification`, `timingsMs`) |
 
 ### Quel outil choisir
 
@@ -63,7 +64,7 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 | Outil | Entrees | Sorties |
 |---|---|---|
-| `rag-hybrid-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt` centre sur le terme, `trouvePar`, `rangVectoriel`, `rangLexical`, `termes`, `fauteDeFrappe`, `dansLeChemin`), `meta` (champs de zone de v1 + `termes`, `termesLexicaux`, `poidsLexical`, `fusion`, `conseil`, `timingsMs`) |
+| `rag-hybrid-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false), `includeContentieux` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt` centre sur le terme, `trouvePar`, `rangVectoriel`, `rangLexical`, `termes`, `fauteDeFrappe`, `dansLeChemin`), `meta` (champs de zone de v1 + `termes`, `termesLexicaux`, `poidsLexical`, `fusion`, `conseil`, `timingsMs`) |
 | `rag-journal-link-v1` | `echecId`, `succesId` (defaut : derniere recherche ratee et derniere reussie de la session), `note` (500 car.) | `ok`, `error?`, `paire` (`id`, `lien: manuel`, `echecId`, `succesId`, `ecartSecondes`) |
 
 Avec `IRIS_RAG_JOURNAL_DIR`, les trois outils RAG ajoutent `meta.journal` (`actif`, `id`, `statut`, `pairesAuto?`, `conseil?`, `nonJournalise?`, `erreur?`). Sans la variable, leur sortie est inchangee.
@@ -104,6 +105,24 @@ mais **jamais** la zone sensible A-2 (liste complete dans le depot prive
 Les motifs sont charges via la variable d'environnement `ZONE_A_PATTERNS_FILE`.
 Ouvrir la zone sensible reste un geste manuel de Peter via
 `query-rag.ps1 -IncludeZoneA -AllowIntime`.
+
+**Zone contentieux (v0.9.0).** Un dossier de litige ne releve ni de l'intime ni des conversations
+brutes : il doit etre ferme par defaut mais ouvrable volontairement. Motifs : cle
+`ragContentieuxContains` du meme fichier de zones.
+
+| Appel | Conversations brutes (A-1) | Contentieux | Zone sensible (A-2) |
+|---|---|---|---|
+| defaut | fermees | fermee | fermee |
+| `includeZoneA: true` | ouvertes | **fermee** | fermee |
+| `includeContentieux: true` | fermees | ouverte | fermee |
+| les deux | ouvertes | ouverte | fermee |
+
+- Un chemin a la fois contentieux et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
+- La liste A-2 est ajoutee dans tous les cas, meme si le fichier ne l'a pas recopiee dans la liste A-1.
+- `meta.filterContentieux` indique si la zone etait fermee pour l'appel.
+- Une recherche `includeContentieux: true` n'est jamais journalisee.
+- A utiliser seulement quand l'utilisateur demande explicitement ce dossier.
+- Fichier de zones illisible : repli fail-closed habituel, aucun motif contentieux connu, rien a ouvrir.
 
 Details ops : depot prive `iris-mcp-server-private` · hub RAG local.
 

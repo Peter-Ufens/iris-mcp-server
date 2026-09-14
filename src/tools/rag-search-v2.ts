@@ -592,6 +592,7 @@ export interface RagSearchInput {
   project?: string;
   sourceContains?: string;
   includeZoneA?: boolean;
+  includeContentieux?: boolean;
   reformulate?: boolean;
   patternsFile?: string;
   glossaryFile?: string;
@@ -604,6 +605,7 @@ export interface RagSearchResult {
   meta: Record<string, unknown> & {
     tool: 'rag-search-v2';
     filterZoneA: boolean;
+    filterContentieux: boolean;
     intimeAlwaysFiltered: true;
     zonePatternsVersion: string;
     count: number;
@@ -620,6 +622,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   const t0 = Date.now();
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
+  const includeContentieux = input.includeContentieux === true;
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
@@ -628,7 +631,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   const genTimeout = Number(process.env.RAG_REFORMULATE_TIMEOUT_MS) || DEFAULT_REFORMULATE_TIMEOUT_MS;
 
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
-  const excludes = resolveExcludes(patterns, includeZoneA);
+  const excludes = resolveExcludes(patterns, includeZoneA, includeContentieux);
   const glossary = loadGlossary(input.glossaryFile ?? null);
 
   const result: RagSearchResult = {
@@ -636,6 +639,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
     meta: {
       tool: 'rag-search-v2',
       filterZoneA: !includeZoneA,
+      filterContentieux: !includeContentieux,
       intimeAlwaysFiltered: true,
       zonePatternsVersion: patterns.version,
       excludePatterns: excludes.length,
@@ -811,7 +815,8 @@ export const tool: IrisTool = {
     limit: z.number().int().min(1).max(25).optional().describe('Nombre de passages (defaut 5, max 25)'),
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
-    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2.'),
+    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2 ni la zone contentieux.'),
+    includeContentieux: z.boolean().optional().describe("Ouvre la zone contentieux (dossier de litige), seulement si l'utilisateur demande explicitement ce dossier (defaut false). N ouvre jamais la zone intime A-2."),
     reformulate: z.boolean().optional().describe('Reformulations par le modele local (defaut true). false = plus rapide.'),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
@@ -823,6 +828,7 @@ export const tool: IrisTool = {
         project: input.project as string | undefined,
         sourceContains: input.sourceContains as string | undefined,
         includeZoneA: input.includeZoneA as boolean | undefined,
+        includeContentieux: input.includeContentieux as boolean | undefined,
         reformulate: input.reformulate as boolean | undefined,
       });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
@@ -831,7 +837,7 @@ export const tool: IrisTool = {
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({ hits: [], meta: { tool: 'rag-search-v2', filterZoneA: true, intimeAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
+          text: JSON.stringify({ hits: [], meta: { tool: 'rag-search-v2', filterZoneA: true, filterContentieux: true, intimeAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
         }],
       };
     }

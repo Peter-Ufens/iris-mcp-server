@@ -4,15 +4,16 @@ import type { IrisTool } from './_types.js';
 import { avecJournal } from '../utils/rag-journal.js';
 
 /**
- * rag-query-v1 — interroge le RAG vault de Peter (Qdrant :6334 + embeddings Ollama).
+ * rag-query-v1 : interroge le RAG vault de Peter (Qdrant :6334 + embeddings Ollama).
  *
  * Pourquoi cet outil : jusqu'ici le seul acces au RAG etait `query-rag.ps1`, lance
  * a la main. Karen / Sharon / Claude Code ne pouvaient pas interroger l'index dans
  * le fil d'une conversation (constat audit 2026-09-02).
  *
- * Gouvernance Zone A — la regle, et elle n'est pas negociable cote MCP :
- *   - par defaut          : Zone A filtree (conversations brutes + intime exclus)
- *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT
+ * Gouvernance Zone A : la regle, et elle n'est pas negociable cote MCP :
+ *   - par defaut          : Zone A filtree (conversations brutes + intime exclus) et zone contentieux fermee
+ *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT (pas le contentieux)
+ *   - includeContentieux  : ouvre la zone contentieux (ragContentieuxContains) UNIQUEMENT
  *   - Zone A-2 "intime"   : JAMAIS ouverte par cet outil, quel que soit l'input.
  *     L'ouverture de l'intime reste un geste manuel et explicite de Peter :
  *     `query-rag.ps1 -IncludeZoneA -AllowIntime`.
@@ -37,6 +38,8 @@ export interface ZonePatterns {
   version: string;
   queryExclude: string[];
   alwaysExclude: string[];
+  /** Zone contentieux : fermee par defaut et avec includeZoneA, ouverte seulement par includeContentieux. */
+  contentieux: string[];
   sourcePriority: Record<string, number>;
   error?: string;
 }
@@ -53,6 +56,7 @@ export interface RagQueryResult {
   hits: RagHit[];
   meta: {
     filterZoneA: boolean;
+    filterContentieux: boolean;
     intimeAlwaysFiltered: true;
     zonePatternsVersion: string;
     excludePatterns: number;
@@ -71,6 +75,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version: 'env-missing',
       queryExclude: FALLBACK_FAIL_CLOSED,
       alwaysExclude: FALLBACK_FAIL_CLOSED,
+      contentieux: [],
       sourcePriority: {},
       error:
         'ZONE_A_PATTERNS_FILE non defini - repli fail-closed. Voir iris-mcp-server-private.',
@@ -83,6 +88,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version?: string;
       ragQueryExcludeContains?: string[];
       ragAlwaysExcludeContains?: string[];
+      ragContentieuxContains?: string[];
       ragSourcePriority?: Record<string, number>;
     };
     const always =
@@ -95,6 +101,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version: j.version ?? 'unknown',
       queryExclude: Array.isArray(j.ragQueryExcludeContains) ? j.ragQueryExcludeContains : [],
       alwaysExclude: always,
+      contentieux: Array.isArray(j.ragContentieuxContains) ? j.ragContentieuxContains : [],
       sourcePriority,
     };
   } catch (e) {
@@ -104,6 +111,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       version: 'unreadable',
       queryExclude: FALLBACK_FAIL_CLOSED,
       alwaysExclude: FALLBACK_FAIL_CLOSED,
+      contentieux: [],
       sourcePriority: {},
       error: `zone-a-patterns illisible (${msg}) - repli fail-closed (conversations + _prive)`,
     };
@@ -126,9 +134,23 @@ export function isPathExcluded(sourcePath: string, excludeContains: string[]): b
   });
 }
 
-/** Motifs a exclure pour cette requete. includeZoneA n'ouvre jamais A-2. */
-export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean): string[] {
-  return includeZoneA ? patterns.alwaysExclude : patterns.queryExclude;
+/**
+ * Motifs a exclure pour cette requete.
+ *
+ * | appel              | A-1 brut | contentieux | A-2 intime |
+ * | defaut             | exclu    | exclu       | exclu      |
+ * | includeZoneA       | ouvert   | exclu       | exclu      |
+ * | includeContentieux | exclu    | ouvert      | exclu      |
+ * | les deux           | ouvert   | ouvert      | exclu      |
+ *
+ * A-2 est ajoute dans tous les cas (meme si le fichier ne l'a pas recopie dans la liste A-1).
+ * Un chemin a la fois contentieux et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
+ * Zones illisibles : repli fail-closed et aucun motif contentieux connu, rien a ouvrir.
+ */
+export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean, includeContentieux = false): string[] {
+  const base = includeZoneA ? patterns.alwaysExclude : [...patterns.queryExclude, ...patterns.alwaysExclude];
+  const out = includeContentieux ? base : [...base, ...(patterns.contentieux ?? [])];
+  return [...new Set(out)];
 }
 
 /** Poids doux Lot B : premier motif chemin qui matche (ordre JSON). Defaut 1.0. */
@@ -222,6 +244,7 @@ export interface RagQueryInput {
   project?: string;
   sourceContains?: string;
   includeZoneA?: boolean;
+  includeContentieux?: boolean;
   qdrantUrl?: string;
   ollamaUrl?: string;
   collection?: string;
@@ -232,18 +255,20 @@ export interface RagQueryInput {
 export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
+  const includeContentieux = input.includeContentieux === true;
   const collection = input.collection ?? process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
   const embedModel = input.embedModel ?? process.env.RAG_EMBED_MODEL ?? DEFAULT_EMBED_MODEL;
 
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
-  const excludes = resolveExcludes(patterns, includeZoneA);
+  const excludes = resolveExcludes(patterns, includeZoneA, includeContentieux);
 
   const base: RagQueryResult = {
     hits: [],
     meta: {
       filterZoneA: !includeZoneA,
+      filterContentieux: !includeContentieux,
       intimeAlwaysFiltered: true,
       zonePatternsVersion: patterns.version,
       excludePatterns: excludes.length,
@@ -346,6 +371,7 @@ export const tool: IrisTool = {
     "Interroge le RAG vault de Peter (Qdrant + embeddings Ollama) et retourne les passages les plus proches. " +
     "Par defaut la Zone A est filtree (conversations brutes exclues) ; includeZoneA=true ouvre les conversations " +
     "brutes (Copilot, Ollama, Claude) mais JAMAIS la zone intime, qui reste filtree en toutes circonstances. " +
+    "La zone contentieux reste fermee sauf includeContentieux=true (seulement a la demande explicite de l'utilisateur). " +
     'Utiliser project ou sourceContains pour cibler un projet ou une source.',
   category: 'memory',
   inputSchema: {
@@ -363,7 +389,13 @@ export const tool: IrisTool = {
       .boolean()
       .optional()
       .describe(
-        'Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2.',
+        'Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2 ni la zone contentieux.',
+      ),
+    includeContentieux: z
+      .boolean()
+      .optional()
+      .describe(
+        "Ouvre la zone contentieux (dossier de litige), seulement si l'utilisateur demande explicitement ce dossier (defaut false). N ouvre jamais la zone intime A-2.",
       ),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
@@ -375,6 +407,7 @@ export const tool: IrisTool = {
         project: input.project as string | undefined,
         sourceContains: input.sourceContains as string | undefined,
         includeZoneA: input.includeZoneA as boolean | undefined,
+        includeContentieux: input.includeContentieux as boolean | undefined,
       });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     } catch (e) {
@@ -385,7 +418,7 @@ export const tool: IrisTool = {
           {
             type: 'text' as const,
             text: JSON.stringify(
-              { hits: [], meta: { filterZoneA: true, intimeAlwaysFiltered: true, count: 0, error: msg } },
+              { hits: [], meta: { filterZoneA: true, filterContentieux: true, intimeAlwaysFiltered: true, count: 0, error: msg } },
               null,
               2,
             ),

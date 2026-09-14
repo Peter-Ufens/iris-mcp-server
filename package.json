@@ -1,7 +1,7 @@
 {
   "name": "iris-mcp-server",
-  "version": "0.8.0",
-  "description": "Serveur MCP modulaire pour Iris - 28 outils (ping, ollama, fs, git, cloud APIs, web, RAG v1/v2/hybride, journal de recherches opt-in) avec auto-decouverte.",
+  "version": "0.9.0",
+  "description": "Serveur MCP modulaire pour Iris - 28 outils (ping, ollama, fs, git, cloud APIs, web, RAG v1/v2/hybride, journal de recherches opt-in, zone contentieux) avec auto-decouverte.",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
