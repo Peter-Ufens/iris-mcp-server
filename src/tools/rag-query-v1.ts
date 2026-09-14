@@ -1,6 +1,7 @@
 import * as z from 'zod/v4';
 import { readFileSync } from 'node:fs';
 import type { IrisTool } from './_types.js';
+import { avecJournal } from '../utils/rag-journal.js';
 
 /**
  * rag-query-v1 — interroge le RAG vault de Peter (Qdrant :6334 + embeddings Ollama).
@@ -365,7 +366,8 @@ export const tool: IrisTool = {
         'Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2.',
       ),
   },
-  execute: async (input) => {
+  // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
+  execute: avecJournal('rag-query-v1', async (input) => {
     try {
       const result = await ragQuery({
         query: String(input.query ?? ''),
@@ -391,5 +393,5 @@ export const tool: IrisTool = {
         ],
       };
     }
-  },
+  }),
 };
