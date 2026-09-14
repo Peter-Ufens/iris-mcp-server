@@ -1,6 +1,6 @@
-# Catalogue des outils MCP - iris-mcp-server v0.7.0
+# Catalogue des outils MCP - iris-mcp-server v0.8.0
 
-27 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
+28 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 
 ## iris (1)
@@ -16,17 +16,19 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 | `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`) |
 | `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat`) |
 
-## memory (3)
+## memory (4)
 
 `rag-query-v1` ajoute en phase 2 RAG (2026-09-02), poids doux et dedoublonnage (2026-09-13).
 `rag-search-v2` ajoute au lot D (2026-09-13), a cote de v1 qui reste inchange.
 `rag-hybrid-v1` ajoute au lot E (2026-09-14) : vectoriel de v1 + lexical sur l'index.
+`rag-journal-link-v1` et le journal opt-in des trois outils RAG ajoutes en v0.8.0 (2026-09-14) : voir [rag-journal.md](rag-journal.md).
 
 | ID | Fichier | Description |
 |---|---|---|
 | `rag-query-v1` | `rag-query-v1.ts` | Interroge le RAG vault (Qdrant `:6334` + embeddings Ollama), rapide, mot-cle ou question simple |
 | `rag-search-v2` | `rag-search-v2.ts` | Recherche qui comprend le vocabulaire de l'utilisateur (glossaire prive, dictee), plusieurs formulations fusionnees, demande un contexte si rien ne repond |
 | `rag-hybrid-v1` | `rag-hybrid-v1.ts` | Recherche des termes exacts : identifiants, noms de fichier ou de variable, chemins partiels, noms propres rares, lettres voisines inversees |
+| `rag-journal-link-v1` | `rag-journal-link-v1.ts` | Journal des recherches (opt-in) : relie une recherche ratee ou en clarification a la recherche qui a trouve la reponse |
 
 | Outil | Entrees | Sorties |
 |---|---|---|
@@ -62,6 +64,9 @@ Chaque outil a un ID unique versionne (`<nom>-v<version>`).
 | Outil | Entrees | Sorties |
 |---|---|---|
 | `rag-hybrid-v1` | `query` (requis), `limit` (1-25, defaut 5), `project`, `sourceContains`, `includeZoneA` (defaut false) | `hits[]` (`score`, `sourceFile`, `source_filename`, `excerpt` centre sur le terme, `trouvePar`, `rangVectoriel`, `rangLexical`, `termes`, `fauteDeFrappe`, `dansLeChemin`), `meta` (champs de zone de v1 + `termes`, `termesLexicaux`, `poidsLexical`, `fusion`, `conseil`, `timingsMs`) |
+| `rag-journal-link-v1` | `echecId`, `succesId` (defaut : derniere recherche ratee et derniere reussie de la session), `note` (500 car.) | `ok`, `error?`, `paire` (`id`, `lien: manuel`, `echecId`, `succesId`, `ecartSecondes`) |
+
+Avec `IRIS_RAG_JOURNAL_DIR`, les trois outils RAG ajoutent `meta.journal` (`actif`, `id`, `statut`, `pairesAuto?`, `conseil?`, `nonJournalise?`, `erreur?`). Sans la variable, leur sortie est inchangee.
 
 ### rag-search-v2 : fonctionnement
 
