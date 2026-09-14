@@ -61,7 +61,7 @@ Statut :
 
 ## Garanties
 
-- `includeZoneA: true` : la recherche **n'est pas journalisee**.
+- `includeZoneA: true` ou `includeContentieux: true` : la recherche **n'est pas journalisee**.
 - Best-effort : si le dossier est inaccessible, l'outil repond normalement et `meta.journal.erreur` le signale.
 - Fichiers en ajout seul (une ligne JSON par ecriture). Plusieurs clients MCP peuvent ecrire dans le meme dossier.
 - Aucun nettoyage ni rotation automatique : a la charge de l'exploitant.

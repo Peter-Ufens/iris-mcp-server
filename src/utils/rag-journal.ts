@@ -9,7 +9,7 @@
  *    le resultat de l'outil est renvoye tel quel, sans relecture ni ecriture.
  *  - Best-effort : une erreur du journal n'empeche jamais l'outil RAG de repondre.
  *  - Le texte des requetes est une donnee privee : le dossier doit etre hors de tout depot.
- *  - includeZoneA=true : rien n'est journalise.
+ *  - includeZoneA=true ou includeContentieux=true : rien n'est journalise.
  *  - Aucune decision ici : le journal ne modifie ni glossaire, ni index.
  *
  * Fichiers (JSONL en ajout seul) dans IRIS_RAG_JOURNAL_DIR :
@@ -165,6 +165,9 @@ export function journaliser(
 ): InfoJournal | null {
   const dir = dossierJournal();
   if (!dir) return null;
+  if (input.includeContentieux === true) {
+    return { actif: true, nonJournalise: 'includeContentieux=true : recherche dans la zone contentieux non journalisee' };
+  }
   if (input.includeZoneA === true) return { actif: true, nonJournalise: 'includeZoneA=true : recherche non journalisee' };
   try {
     const { statut, confiance } = classer(outil, result);

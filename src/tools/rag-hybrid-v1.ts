@@ -217,6 +217,7 @@ export interface RagHybridInput {
   project?: string;
   sourceContains?: string;
   includeZoneA?: boolean;
+  includeContentieux?: boolean;
   patternsFile?: string;
   qdrantUrl?: string;
   ollamaUrl?: string;
@@ -227,6 +228,7 @@ export interface RagHybridResult {
   meta: Record<string, unknown> & {
     tool: 'rag-hybrid-v1';
     filterZoneA: boolean;
+    filterContentieux: boolean;
     intimeAlwaysFiltered: true;
     zonePatternsVersion: string;
     count: number;
@@ -238,16 +240,18 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   const t0 = Date.now();
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
+  const includeContentieux = input.includeContentieux === true;
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
-  const excludes = resolveExcludes(patterns, includeZoneA);
+  const excludes = resolveExcludes(patterns, includeZoneA, includeContentieux);
 
   const result: RagHybridResult = {
     hits: [],
     meta: {
       tool: 'rag-hybrid-v1',
       filterZoneA: !includeZoneA,
+      filterContentieux: !includeContentieux,
       intimeAlwaysFiltered: true,
       zonePatternsVersion: patterns.version,
       excludePatterns: excludes.length,
@@ -275,6 +279,7 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
     project: input.project,
     sourceContains: input.sourceContains,
     includeZoneA,
+    includeContentieux,
     patternsFile: input.patternsFile,
     qdrantUrl: input.qdrantUrl,
     ollamaUrl: input.ollamaUrl,
@@ -425,7 +430,8 @@ export const tool: IrisTool = {
     limit: z.number().int().min(1).max(25).optional().describe('Nombre de passages (defaut 5, max 25)'),
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
-    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2.'),
+    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2 ni la zone contentieux.'),
+    includeContentieux: z.boolean().optional().describe("Ouvre la zone contentieux (dossier de litige), seulement si l'utilisateur demande explicitement ce dossier (defaut false). N ouvre jamais la zone intime A-2."),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
   execute: avecJournal('rag-hybrid-v1', async (input) => {
@@ -436,6 +442,7 @@ export const tool: IrisTool = {
         project: input.project as string | undefined,
         sourceContains: input.sourceContains as string | undefined,
         includeZoneA: input.includeZoneA as boolean | undefined,
+        includeContentieux: input.includeContentieux as boolean | undefined,
       });
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     } catch (e) {
@@ -443,7 +450,7 @@ export const tool: IrisTool = {
       return {
         content: [{
           type: 'text' as const,
-          text: JSON.stringify({ hits: [], meta: { tool: 'rag-hybrid-v1', filterZoneA: true, intimeAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
+          text: JSON.stringify({ hits: [], meta: { tool: 'rag-hybrid-v1', filterZoneA: true, filterContentieux: true, intimeAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
         }],
       };
     }

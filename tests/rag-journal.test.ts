@@ -130,6 +130,16 @@ describe('journal RAG / active', () => {
     expect(lignes(process.env[JOURNAL_ENV]!, 'evenements.jsonl')).toHaveLength(0);
   });
 
+  it('includeContentieux=true : rien n est journalise, meme avec includeZoneA', async () => {
+    for (const opts of [{ includeContentieux: true }, { includeContentieux: true, includeZoneA: true }]) {
+      const exec = avecJournal('rag-hybrid-v1', faux(succes()));
+      const payload = JSON.parse((await exec({ query: 'dossier kordex', ...opts })).content[0]!.text);
+      expect(payload.meta.journal.nonJournalise).toMatch(/includeContentieux/);
+    }
+    expect(lignes(process.env[JOURNAL_ENV]!, 'evenements.jsonl')).toHaveLength(0);
+    expect(fs.appendFileSync).not.toHaveBeenCalled();
+  });
+
   it('paire auto : clarification puis echec puis succes dans la fenetre -> 2 paires, pas de doublon ensuite', async () => {
     await avecJournal('rag-search-v2', faux(clarification))({ query: 'le sorblat qui plante' });
     await avecJournal('rag-query-v1', faux(vide))({ query: 'sorblat plantage' });
