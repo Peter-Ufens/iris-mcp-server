@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { IrisTool } from './_types.js';
+import { avecJournal } from '../utils/rag-journal.js';
 import {
   dedupKey,
   isPathExcluded,
@@ -813,7 +814,8 @@ export const tool: IrisTool = {
     includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone intime A-2.'),
     reformulate: z.boolean().optional().describe('Reformulations par le modele local (defaut true). false = plus rapide.'),
   },
-  execute: async (input) => {
+  // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
+  execute: avecJournal('rag-search-v2', async (input) => {
     try {
       const result = await ragSearch({
         query: String(input.query ?? ''),
@@ -833,5 +835,5 @@ export const tool: IrisTool = {
         }],
       };
     }
-  },
+  }),
 };

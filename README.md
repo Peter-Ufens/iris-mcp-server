@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.7.0` · **27 outils** · **262 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.8.0` · **28 outils** · **275 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -21,13 +21,14 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 27 outils MCP operationnels | OK, testes (Vitest 262/262) |
+| 28 outils MCP operationnels | OK, testes (Vitest 275/275) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 12 APIs cloud sans compte perso | OK (meteo, heure, news, traduction, NASA APOD, etc.) |
 | Outils web (fetch URL, recherche, Wikipedia) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) |
 | RAG vault (`rag-query-v1` + `rag-search-v2` + `rag-hybrid-v1`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
+| Journal des recherches RAG (opt-in `IRIS_RAG_JOURNAL_DIR`) | OK, desactive par defaut · [docs/rag-journal.md](docs/rag-journal.md) |
 | Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
 | Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
 
@@ -62,7 +63,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.7.0 - 27)
+## Outils disponibles (v0.8.0 - 28)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -93,6 +94,7 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
 | `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
 | `rag-hybrid-v1` | memory | RAG vectoriel + lexical : identifiants, noms de fichier, fautes de frappe |
+| `rag-journal-link-v1` | memory | Journal opt-in : confirme qu'une recherche ratee a trouve sa reponse ensuite |
 
 Detail : [docs/tool-catalog.md](docs/tool-catalog.md).
 
@@ -107,7 +109,7 @@ iris-mcp-server/
 │   ├── tools/
 │   │   ├── _types.ts         # Interface IrisTool
 │   │   ├── _registry.ts      # Auto-decouverte
-│   │   └── *-v*.ts           # 27 outils (v1, rag-search-v2, rag-hybrid-v1)
+│   │   └── *-v*.ts           # 28 outils (v1, rag-search-v2, rag-hybrid-v1, rag-journal-link-v1)
 │   └── utils/
 │       ├── env.ts
 │       ├── path-guard.ts     # ALLOWED_ROOTS, anti traversal
