@@ -98,6 +98,16 @@ Format du glossaire : tableaux Markdown `Tu dis | Terme | Ou chercher | Preuve |
 tableau `Forme | Pourquoi` pour les pieges (jamais de reecriture automatique), section tics.
 Les lignes « a valider » servent d'indice au modele mais ne reecrivent jamais la question.
 
+### Trois objets, trois noms (ne pas confondre)
+
+| Objet | Public ? | Role |
+|---|---|---|
+| **Glossaire de recherche** (`glossaire-recherche.md`) | **Non** (chemin `RAG_GLOSSARY_FILE`) | Vocabulaire reel de l'utilisateur |
+| **Mecanisme de lecture** (`parseGlossary` / `rag-search-v2`) | **Oui** (ce depot) | Traduit la dictee sans stocker le vocabulaire ici |
+| **Lexique evolutif** (outil observe / backtest / store) | **Non** dans ce depot | Chantier ops separe, **STOP apres G2** (critere rappel non tenu) ; le store de candidats reste hors git public |
+
+Le fichier `GLOSSAIRE.md` du template public `obsidian-rag-pipeline` est un **lexique pedagogique** (Vault, RAG, Ollama…). Ce n'est ni (1) ni (3).
+
 **Gouvernance Zone A - non negociable.** Par defaut les conversations brutes sont
 exclues. `includeZoneA: true` ouvre les conversations brutes (Copilot, Ollama, Claude)
 mais **jamais** la zone sensible A-2 (liste complete dans le depot prive
