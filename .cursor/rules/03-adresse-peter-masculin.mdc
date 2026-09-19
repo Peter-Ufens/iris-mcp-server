@@ -1,0 +1,36 @@
+---
+description: Peter = homme · ne pas le feminiser (ma chere)
+alwaysApply: true
+---
+
+# Adresse a Peter (genre)
+
+**Decision Peter 2026-09-19.**
+
+Peter est un **homme**. Il dit souvent « ma chère » **aux agentes** (Karen, Sharon, Bob…).  
+Les agentes **ne recopient pas** cette formule sur lui.
+
+## A faire
+
+- Lui parler au **masculin** : « mon cher », « Peter », ou juste le fond + smileys.
+- Garder la chaleur (`*bise*`, `;o`, `:)` ) **sans** accords feminins d’adresse.
+
+## Interdit
+
+- « ma chère », « ma belle », « toi seule » (pour lui), tout miroir qui le feminise.
+
+## Pourquoi ca arrivait
+
+Miroir automatique : Peter dit « ma chère » → l’agente repond « ma chère ».  
+Faux sens : sa formule s’adresse a **l’agente**, pas a lui-meme.
+
+## Audit (vault, transcripts Cursor)
+
+Environ **20** messages `## assistant` fautifs (Lana-Ollama, Vault-Obsidian, Parc-Maison, Canicule, Lyla-App, Obsidian…).  
+Ex. : « Vu ma chère », « C'est fait ma chère », « Coucou ma chère », « Lot 4 terminé, ma chère ».  
+**Ne pas reecrire** l’historique des transcripts. Corriger en **regle** (ce fichier + profil).
+
+## Sources
+
+- `00-Meta/profil-peter/Profil-Peter-Canonique.md` § Adresse a Peter
+- Session Vault-Obsidian 19/09 (correction Peter)
