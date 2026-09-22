@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-08-07) :** **v0.5.0 livree** · **24 outils** · **205 tests** · repo **public** GitHub.  
-> Extensions (memoire, Lyla, HTTP/SSE) : roadmap, pas urgent.
+> **Etat live (2026-09-22) :** **v0.9.0** · **28 outils** · **283 tests** · repo **public** GitHub.  
+> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Projet hub Iris-MCP = **`cloture`**.
 
 ---
 
-## Etat present : v0.5.0 (aout 2026)
+## Etat present : v0.9.0 (septembre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -14,6 +14,9 @@
 | v0.4.0 | 6 APIs cloud (meteo, heure, IP, devises, feries, dictionnaire) | ✅ |
 | v0.4.2 | +6 APIs (geocoding, sunrise, news, translate, random-fact, NASA APOD) | ✅ |
 | v0.5.0 | outils **web** : `fetch-url-v1`, `web-search-ddg-v1`, `wikipedia-search-v1` + garde anti-SSRF | ✅ |
+| v0.6.0–0.7.0 | RAG vault : `rag-query-v1`, `rag-search-v2`, `rag-hybrid-v1` | ✅ |
+| v0.8.0 | `rag-journal-link-v1` (journal recherches opt-in) | ✅ |
+| v0.9.0 | zone contentieux + `includeContentieux` | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
 
@@ -111,4 +114,4 @@ Detail : hub `planning/backlog-cli-iris-2026-09-02.md` (projet Iris-MCP **`clotu
 
 ---
 
-*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2) · MAJ lot web v0.5.0 : 2026-08-07 Claude Code.*
+*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2) · MAJ lot web v0.5.0 : 2026-08-07 Claude Code · MAJ v0.9.0 live : 2026-09-22 Karen.*
