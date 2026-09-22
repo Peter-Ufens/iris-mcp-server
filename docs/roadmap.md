@@ -29,7 +29,9 @@ Decision et regles de securite : ADR-0005 (hub Iris-MCP) et [securite-web.md](se
 
 ## Roadmap a venir (non engagee tant que pause)
 
-Les sections ci-dessous decrivent la **vision** Sharon (mai 2026). Dates indicatives, reversibles.
+Les sections ci-dessous decrivent la **vision** Sharon (mai 2026), **renumerotee le 22/09/2026**
+parce que les paliers **v0.6.0 a v0.9.0** ont ete pris par le lot web puis le RAG vault.
+Dates indicatives, reversibles.
 
 ### v0.4.5 — APIs etendues
 
@@ -38,7 +40,8 @@ Largement **deja livre** en v0.4.2 (geocoding, sunrise, news, translate, random-
 ### Memoire partagee locale (ex v0.5.0, a replanifier)
 
 `memory-write-v1`, `memory-read-v1`, `memory-search-v1` (JSON V1, extensible Qdrant).
-Non livre : le numero 0.5.0 a ete pris par le lot web.
+Non livre sous ces noms : le numero 0.5.0 a ete pris par le lot web ;
+le RAG vault livre en v0.6–0.9 est une autre voie (Qdrant + outils `rag-*`).
 
 ### ~~v0.6.0 — Recherche web gratuite~~ : **livre en v0.5.0**
 
@@ -47,17 +50,20 @@ Reste ouvert sur ce theme (non engage) : recherche web indexee avec cle (Brave S
 API, `BRAVE_API_KEY` commente dans `.env.example`), l'Instant Answer de DuckDuckGo ne
 couvrant pas tout le web.
 
-### v0.7.0 — Surveillance ecosysteme
+### v0.10.0 — Surveillance ecosysteme (ex vision « v0.7.0 »)
 
 `lyla-health-v1`, `ollama-status-v1`, `system-stats-v1`.
+(Numero 0.7.0 deja pris par `rag-hybrid-v1`.)
 
-### v0.8.0 — Routing intelligent
+### v0.11.0 — Routing intelligent (ex vision « v0.8.0 »)
 
 `route-v1` (choix LLM local vs cloud).
+(Numero 0.8.0 deja pris par `rag-journal-link-v1`.)
 
-### v0.9.0 — Registres dynamiques
+### v0.12.0 — Registres dynamiques (ex vision « v0.9.0 »)
 
 `agent-list/add/update`, `model-list/add/remove/test`.
+(Numero 0.9.0 deja pris par zone contentieux.)
 
 ### v1.0.0 — Transport HTTP/SSE + exposition distante
 
@@ -68,7 +74,7 @@ couvrant pas tout le web.
 
 ---
 
-## Securite (etat reel v0.5.0)
+## Securite (etat reel v0.9.0)
 
 iris-mcp-server suit les bonnes pratiques MCP quand c'est applicable en **mode lab local** :
 
@@ -96,7 +102,7 @@ npx @modelcontextprotocol/inspector node dist/index.js
 ### Complement CLI (parké, hub 2026-09-02)
 
 CLI mince **optionnel** (ping, list-tools, debug) reutilisant les modules `src/`,
-sans refaire les 24 outils en commandes. MCP reste le canal principal pour les clients IA.
+sans refaire les 28 outils en commandes. MCP reste le canal principal pour les clients IA.
 Detail : hub `planning/backlog-cli-iris-2026-09-02.md` (projet Iris-MCP **`cloture`**).
 
 ## Hors scope (projets separes)
