@@ -118,7 +118,7 @@ iris-mcp-server/
 │       ├── url-guard.ts      # Garde anti-SSRF des URL client
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       └── html-text.ts      # HTML vers texte
-├── tests/                    # Vitest (247 tests)
+├── tests/                    # Vitest (283 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json
