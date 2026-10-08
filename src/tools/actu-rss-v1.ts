@@ -12,7 +12,15 @@ import {
   type ParsedFeedItem,
 } from '../utils/rss-parse.js';
 
-type Zone = 'france' | 'alsace' | 'ia' | 'monde' | 'tout';
+type Zone =
+  | 'france'
+  | 'alsace'
+  | 'ia'
+  | 'monde'
+  | 'guadeloupe'
+  | 'usa'
+  | 'asie_ia'
+  | 'tout';
 
 interface FeedDef {
   id: string;
@@ -80,10 +88,75 @@ const FEEDS: FeedDef[] = [
     zones: ['ia', 'tout'],
     kind: 'publisher',
   },
+  // Guadeloupe : pas de RSS éditeur stable (la1ere renvoie du HTML).
+  // Découverte Google en URL fixe (pas d'URL client) + franceinfo titres.
+  {
+    id: 'google-guadeloupe',
+    name: 'Google Actualités Guadeloupe',
+    url: 'https://news.google.com/rss/search?q=Guadeloupe+when:2d&hl=fr&gl=FR&ceid=FR:fr',
+    zones: ['guadeloupe'],
+    kind: 'discovery',
+  },
+  {
+    id: 'franceinfo-guadeloupe',
+    name: 'franceinfo',
+    url: 'https://www.franceinfo.fr/titres.rss',
+    zones: ['guadeloupe'],
+    kind: 'publisher',
+  },
+  {
+    id: 'bbc-us-canada',
+    name: 'BBC US & Canada',
+    url: 'https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml',
+    zones: ['usa', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'nyt-us',
+    name: 'NYT US',
+    url: 'https://rss.nytimes.com/services/xml/rss/nyt/US.xml',
+    zones: ['usa', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'techcrunch-ai',
+    name: 'TechCrunch AI',
+    url: 'https://techcrunch.com/category/artificial-intelligence/feed/',
+    zones: ['asie_ia', 'ia', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'verge-ai',
+    name: 'The Verge AI',
+    url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml',
+    zones: ['asie_ia', 'ia', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'cna-asia',
+    name: 'Channel News Asia',
+    url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511',
+    zones: ['asie_ia', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'japan-times',
+    name: 'Japan Times',
+    url: 'https://www.japantimes.co.jp/feed/topstories/',
+    zones: ['asie_ia', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'google-asie-ia',
+    name: 'Google Actualités IA Asie',
+    url: 'https://news.google.com/rss/search?q=artificial+intelligence+(China+OR+Japan+OR+Korea+OR+Singapore+OR+Asia)+when:7d&hl=en&gl=US&ceid=US:en',
+    zones: ['asie_ia'],
+    kind: 'discovery',
+  },
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités : recherche nationale (la zone ne s’applique pas), liens non citables comme source éditeur. Zone ia = flux IA/tech numériques (ActuIA, Pixels, Siècle Digital) ; affiner avec query si besoin.';
+  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités (liens non citables comme source éditeur). Zone ia = ActuIA/Pixels/Siècle Digital (+ TechCrunch/Verge si tout). Zone guadeloupe = Google découverte fixe + franceinfo (pas de RSS la1ere stable). Zone usa = BBC US + NYT US. Zone asie_ia = TechCrunch AI, Verge AI, CNA, Japan Times + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -148,7 +221,7 @@ function googleNewsUrl(query: string): string {
 export const tool: IrisTool = {
   id: 'actu-rss-v1',
   description:
-    'Actualité via flux RSS fixes (France / Alsace / IA). Titres, dates, liens éditeur https. Pas de LLM. ADR-0006. Zone ia : ActuIA + Le Monde Pixels + Siècle Digital.',
+    'Actualité via flux RSS fixes (France / Alsace / IA / Guadeloupe / USA / Asie-IA). Titres, dates, liens éditeur https. Pas de LLM. ADR-0006.',
   category: 'web',
   inputSchema: {
     query: z
@@ -158,7 +231,7 @@ export const tool: IrisTool = {
       .optional()
       .describe('Mots-clés optionnels (filtre titres / résumés)'),
     zone: z
-      .enum(['france', 'alsace', 'ia', 'monde', 'tout'])
+      .enum(['france', 'alsace', 'ia', 'monde', 'guadeloupe', 'usa', 'asie_ia', 'tout'])
       .optional()
       .default('tout')
       .describe('Choix des flux'),
@@ -185,8 +258,12 @@ export const tool: IrisTool = {
       .describe('Ajoute Google Actualités (découverte seulement)'),
   },
   execute: async (input) => {
-    const query = (input.query as string | undefined)?.trim() || '';
     const zone = ((input.zone as Zone | undefined) ?? 'tout') as Zone;
+    // Guadeloupe : sans RSS éditeur local stable, le filtre défaut évite
+    // que franceinfo national noie la zone (découverte Google reste la base).
+    const queryRaw = (input.query as string | undefined)?.trim() || '';
+    const query =
+      queryRaw || (zone === 'guadeloupe' ? 'Guadeloupe' : '');
     const sinceHours = (input.since_hours as number | undefined) ?? 48;
     const limit = (input.limit as number | undefined) ?? 10;
     const googleNews = (input.google_news as boolean | undefined) ?? false;
