@@ -57,6 +57,73 @@ export function parseFeedDate(raw: string | null | undefined): string | null {
   return d.toISOString();
 }
 
+/**
+ * Bing Actualités étiquette `GMT` alors que l'horloge est America/Los_Angeles
+ * (mesure Bob+Karen 08/10 : écart pile −7 h PDT). Sans correction, since_hours
+ * jette des articles frais.
+ */
+export function getTimeZoneOffsetMs(timeZone: string, date: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'longOffset',
+  }).formatToParts(date);
+  const tz = parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+  const m = /GMT([+-])(\d{2}):(\d{2})/.exec(tz);
+  if (!m) return -7 * 3_600_000;
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (Number(m[2]) * 60 + Number(m[3])) * 60_000;
+}
+
+/** pubDate Bing (GMT faux) → ISO UTC réel. Autres dates : parseFeedDate. */
+export function parseBingPubDate(raw: string | null | undefined): string | null {
+  if (!raw || !raw.trim()) return null;
+  const trimmed = raw.trim();
+  if (!/GMT\s*$/i.test(trimmed)) return parseFeedDate(trimmed);
+  const wrongAsUtc = Date.parse(trimmed);
+  if (Number.isNaN(wrongAsUtc)) return null;
+  const offset = getTimeZoneOffsetMs('America/Los_Angeles', new Date(wrongAsUtc));
+  return new Date(wrongAsUtc - offset).toISOString();
+}
+
+/**
+ * Lien apiclick Bing → URL éditeur https (paramètre `url=`).
+ * Sans ça, le filtre https refuse le lien Bing en http.
+ */
+export function decodeBingEditorUrl(link: string): string {
+  try {
+    const u = new URL(link);
+    if (
+      !(
+        u.hostname === 'www.bing.com' ||
+        u.hostname === 'bing.com' ||
+        u.hostname.endsWith('.bing.com')
+      )
+    ) {
+      return link;
+    }
+    if (!u.pathname.includes('/news/apiclick')) return link;
+    const raw = u.searchParams.get('url');
+    if (!raw) return link;
+    const decoded = decodeURIComponent(raw);
+    return /^https:\/\//i.test(decoded) ? decoded : link;
+  } catch {
+    return link;
+  }
+}
+
+export function isBingNewsUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname === 'www.bing.com' ||
+      u.hostname === 'bing.com' ||
+      u.hostname.endsWith('.bing.com')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function normalizeTitle(title: string): string {
   return title
     .normalize('NFD')
@@ -103,6 +170,8 @@ function parseRssItems(xml: string): ParsedFeedItem[] {
       const guid = tagText(block, 'guid');
       if (guid.startsWith('http')) url = guid;
     }
+    const fromBing = isBingNewsUrl(url);
+    url = decodeBingEditorUrl(url);
     const pub =
       tagText(block, 'pubDate') ||
       tagText(block, 'dc:date') ||
@@ -112,11 +181,12 @@ function parseRssItems(xml: string): ParsedFeedItem[] {
       tagText(block, 'content:encoded') ||
       '';
     if (!title && !url) continue;
-    const sourceName = tagText(block, 'source');
+    const sourceName =
+      tagText(block, 'source') || tagText(block, 'News:Source');
     items.push({
       title: sanitizeTitle(title),
       url,
-      published_at: parseFeedDate(pub),
+      published_at: fromBing ? parseBingPubDate(pub) : parseFeedDate(pub),
       summary: truncateSummary(summary),
       ...(sourceName ? { source_name: sourceName } : {}),
     });
