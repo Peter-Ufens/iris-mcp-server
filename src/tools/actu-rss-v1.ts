@@ -64,6 +64,10 @@ const FEEDS: FeedDef[] = [
     url: 'https://france3-regions.franceinfo.fr/grand-est/rss',
     zones: ['alsace', 'france', 'tout'],
     kind: 'publisher',
+    // K-1 / ADR-0009 : en zone alsace, seulement Bas-Rhin / Haut-Rhin / alsace (pas Nancy/Reims)
+    zoneFilter: {
+      alsace: /\/grand-est\/(bas-rhin|haut-rhin|alsace)(\/|$|\?)/i,
+    },
   },
   {
     id: 'dna',
@@ -173,7 +177,7 @@ const FEEDS: FeedDef[] = [
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel / non commercial. Lire l’article (fetch-url-v1) avant d’affirmer un fait. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] liens éditeur ; Google → decouverte[]) : recherche nationale, la zone ne s’y applique pas (zone « tout »). Heure Bing approximative (date_approx) : lire la date sur la page de l’éditeur avant d’affirmer une heure. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte fixe. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel / non commercial. Titre ≠ fait : lire l’article (fetch-url-v1 ou navigateur) avant d’affirmer. Si date_approx (Bing) : ne pas citer une heure sans la page éditeur. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] ; Google → decouverte[]) : recherche nationale (zone sortie « tout »). Zone alsace = DNA / L’Alsace + France 3 limité Bas-Rhin·Haut-Rhin·alsace. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -472,7 +476,8 @@ export const tool: IrisTool = {
         const zoneFilter = def.zoneFilter?.[zone];
         for (const it of items) {
           if (!it.url || !/^https:\/\//i.test(it.url)) continue;
-          if (zoneFilter && !zoneFilter.test(`${it.title} ${it.summary}`)) continue;
+          // Titre + résumé + URL (ADR-0009 : filtre Alsace sur le chemin France 3)
+          if (zoneFilter && !zoneFilter.test(`${it.title} ${it.summary} ${it.url}`)) continue;
           const discovery =
             def.kind === 'discovery' || isGoogleNewsUrl(it.url);
           const age = ageHours(it.published_at, now);

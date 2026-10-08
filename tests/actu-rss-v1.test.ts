@@ -327,6 +327,66 @@ describe('actu-rss-v1', () => {
     expect(payload.items.every((i: { zone: string }) => i.zone === 'ia')).toBe(true);
   });
 
+  it('zone alsace : France 3 seulement Bas-Rhin / Haut-Rhin / alsace (pas Reims/Nancy)', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('france3') || url.includes('grand-est/rss')) {
+        return okText(
+          url,
+          rss([
+            {
+              title: 'Policier blesse a Reims',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/marne/reims/policier.html',
+            },
+            {
+              title: 'Nancy : greve des trams',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/meurthe-et-moselle/nancy/greve.html',
+            },
+            {
+              title: 'Strasbourg : lycees bloques',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/bas-rhin/strasbourg/lycees.html',
+            },
+            {
+              title: 'Colmar : marche',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/haut-rhin/colmar/marche.html',
+            },
+          ]),
+        );
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({ zone: 'alsace', limit: 10 });
+    const urls = payload.items.map((i: { url: string }) => i.url);
+    expect(urls).toContain(
+      'https://france3-regions.franceinfo.fr/grand-est/bas-rhin/strasbourg/lycees.html',
+    );
+    expect(urls).toContain(
+      'https://france3-regions.franceinfo.fr/grand-est/haut-rhin/colmar/marche.html',
+    );
+    expect(urls.some((u: string) => u.includes('/marne/'))).toBe(false);
+    expect(urls.some((u: string) => u.includes('/nancy/'))).toBe(false);
+  });
+
+  it('zone france : France 3 Grand Est sans filtre Alsace (Reims OK)', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('france3') || url.includes('grand-est/rss')) {
+        return okText(
+          url,
+          rss([
+            {
+              title: 'Reims',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/marne/reims/x.html',
+            },
+          ]),
+        );
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({ zone: 'france', limit: 5 });
+    expect(
+      payload.items.some((i: { url: string }) => i.url.includes('/marne/reims/')),
+    ).toBe(true);
+  });
+
   it('zone usa appelle BBC et NYT', async () => {
     mockFetch.mockImplementation(async (url: string) =>
       okText(url, rss([{ title: 'US Senate vote', link: `${url}/item1` }])),
