@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.10.2` · **29 outils** · **320 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.11.0` · **29 outils** · **328 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -21,13 +21,13 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 29 outils MCP operationnels | OK, testes (Vitest 320/320) |
+| 29 outils MCP operationnels | OK, testes (Vitest 328/328) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 11 APIs cloud sans compte perso | OK (meteo, news HN, traduction, NASA APOD, etc.) |
 | Heure locale (`time-v1`, categorie iris) | OK, Intl serveur (plus de WorldTimeAPI) |
-| Outils web (fetch URL, recherche, Wikipedia, actu RSS) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) · `actu-rss-v1` = titres/liens flux fixes |
+| Outils web (fetch URL, recherche, Wikipedia, actu RSS) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) · `actu-rss-v1` = flux fixes + Bing/Google (`recherche`) |
 | RAG vault (`rag-query-v1` + `rag-search-v2` + `rag-hybrid-v1`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
 | Journal des recherches RAG (opt-in `IRIS_RAG_JOURNAL_DIR`) | OK, desactive par defaut · [docs/rag-journal.md](docs/rag-journal.md) |
 | Zone contentieux (`ragContentieuxContains`, opt-in `includeContentieux`) | OK, fermee par defaut et avec `includeZoneA` · [docs/tool-catalog.md](docs/tool-catalog.md) |
@@ -65,7 +65,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.10.2 - 29)
+## Outils disponibles (v0.11.0 - 29)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -93,7 +93,7 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `fetch-url-v1` | web | Contenu texte d'une URL https (garde SSRF, plafonds) |
 | `web-search-ddg-v1` | web | Recherche DuckDuckGo Instant Answer (sans cle) |
 | `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
-| `actu-rss-v1` | web | Titres / liens actualite (flux fixes : france/alsace/ia/guadeloupe/usa/asie_ia ; Guadeloupe = La 1ere) |
+| `actu-rss-v1` | web | Titres / liens actualite (flux fixes + `recherche=bing|google|les_deux`) |
 | `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
 | `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
 | `rag-hybrid-v1` | memory | RAG vectoriel + lexical : identifiants, noms de fichier, fautes de frappe |
@@ -121,7 +121,7 @@ iris-mcp-server/
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       ├── html-text.ts      # HTML vers texte
 │       └── rss-parse.ts      # Lecteur RSS/Atom maison (actu-rss-v1)
-├── tests/                    # Vitest (320 tests)
+├── tests/                    # Vitest (328 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json

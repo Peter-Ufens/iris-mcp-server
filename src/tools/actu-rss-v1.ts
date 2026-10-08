@@ -171,7 +171,7 @@ const FEEDS: FeedDef[] = [
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités (liens non citables comme source éditeur). Zone ia = ActuIA/Pixels/Siècle Digital (+ TechCrunch/Verge si tout). Zone guadeloupe = La 1ère Guadeloupe + Google découverte. Zone usa = BBC US + NYT US. Zone asie_ia = articles à la fois IA et Asie (TechCrunch AI, Verge AI, CNA, Japan Times filtrés) + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel / non commercial. Lire l’article (fetch-url-v1) avant d’affirmer un fait. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] liens éditeur ; Google → decouverte[]). Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte fixe. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -233,10 +233,33 @@ function googleNewsUrl(query: string): string {
   return `https://news.google.com/rss/search?q=${q}&hl=fr&gl=FR&ceid=FR:fr`;
 }
 
+/** Bing : interval "7" = 24 h, "8" = 7 jours (doc / mesures Bob 08/10). */
+function bingNewsUrl(query: string, sinceHours: number): string {
+  const interval = sinceHours <= 24 ? '7' : '8';
+  const q = encodeURIComponent(query);
+  return `https://www.bing.com/news/search?q=${q}&format=rss&qft=interval%3D%22${interval}%22&setlang=fr-FR`;
+}
+
+type Recherche = 'aucune' | 'google' | 'bing' | 'les_deux';
+
+function resolveRecherche(
+  recherche: Recherche | undefined,
+  googleNewsFlag: boolean,
+): { wantGoogle: boolean; wantBing: boolean } {
+  if (recherche && recherche !== 'aucune') {
+    return {
+      wantGoogle: recherche === 'google' || recherche === 'les_deux',
+      wantBing: recherche === 'bing' || recherche === 'les_deux',
+    };
+  }
+  // Compat : google_news true = Google (ADR-0006)
+  return { wantGoogle: googleNewsFlag, wantBing: false };
+}
+
 export const tool: IrisTool = {
   id: 'actu-rss-v1',
   description:
-    'Actualité via flux RSS fixes (France / Alsace / IA / Guadeloupe / USA / Asie-IA). Titres, dates, liens éditeur https. Pas de LLM. ADR-0006.',
+    'Actualité via flux RSS fixes (France / Alsace / IA / Guadeloupe / USA / Asie-IA) + recherche Bing/Google. Titres, dates, liens éditeur https. Pas de LLM. ADR-0006/0008.',
   category: 'web',
   inputSchema: {
     query: z
@@ -244,7 +267,7 @@ export const tool: IrisTool = {
       .min(1)
       .max(120)
       .optional()
-      .describe('Mots-clés optionnels (filtre titres / résumés)'),
+      .describe('Mots-clés optionnels (filtre titres / résumés ; requis pour recherche Bing/Google)'),
     zone: z
       .enum(['france', 'alsace', 'ia', 'monde', 'guadeloupe', 'usa', 'asie_ia', 'tout'])
       .optional()
@@ -270,7 +293,12 @@ export const tool: IrisTool = {
       .boolean()
       .optional()
       .default(false)
-      .describe('Ajoute Google Actualités (découverte seulement)'),
+      .describe('Compat : ajoute Google Actualités (découverte). Préférer `recherche`.'),
+    recherche: z
+      .enum(['aucune', 'google', 'bing', 'les_deux'])
+      .optional()
+      .default('aucune')
+      .describe('Voie B : aucune / google (decouverte) / bing (items éditeur) / les_deux'),
   },
   execute: async (input) => {
     const zone = ((input.zone as Zone | undefined) ?? 'tout') as Zone;
@@ -279,7 +307,9 @@ export const tool: IrisTool = {
     const query = (input.query as string | undefined)?.trim() || '';
     const sinceHours = (input.since_hours as number | undefined) ?? 48;
     const limit = (input.limit as number | undefined) ?? 10;
-    const googleNews = (input.google_news as boolean | undefined) ?? false;
+    const googleNewsFlag = (input.google_news as boolean | undefined) ?? false;
+    const recherche = (input.recherche as Recherche | undefined) ?? 'aucune';
+    const { wantGoogle, wantBing } = resolveRecherche(recherche, googleNewsFlag);
 
     const now = new Date();
     const todayFmt = new Intl.DateTimeFormat('en-CA', {
@@ -307,7 +337,7 @@ export const tool: IrisTool = {
       def,
       url: def.url,
     }));
-    if (googleNews && query) {
+    if (wantGoogle && query) {
       jobs.push({
         def: {
           id: 'google-news',
@@ -317,6 +347,20 @@ export const tool: IrisTool = {
           kind: 'discovery',
         },
         url: googleNewsUrl(query),
+      });
+    }
+    if (wantBing && query) {
+      const bingUrl = bingNewsUrl(query, sinceHours);
+      jobs.push({
+        def: {
+          id: 'bing-news',
+          name: 'Bing Actualités',
+          url: bingUrl,
+          zones: ['tout'],
+          // Lien éditeur décodé → items[] citables (ADR-0008)
+          kind: 'publisher',
+        },
+        url: bingUrl,
       });
     }
 
@@ -334,13 +378,22 @@ export const tool: IrisTool = {
     };
 
     const feeds: FeedState[] = [];
-    if (googleNews && !query) {
+    if (wantGoogle && !query) {
       feeds.push({
         id: 'google-news',
         name: 'Google Actualités',
         url: '',
         status: 'erreur',
-        message: 'non appelé : google_news demande une query',
+        message: 'non appelé : recherche Google demande une query',
+      });
+    }
+    if (wantBing && !query) {
+      feeds.push({
+        id: 'bing-news',
+        name: 'Bing Actualités',
+        url: '',
+        status: 'erreur',
+        message: 'non appelé : recherche Bing demande une query',
       });
     }
     const collected: {
@@ -425,7 +478,8 @@ export const tool: IrisTool = {
             Date.parse(it.published_at) - Date.parse(dateUrl) > REPUBLICATION_MS;
           collected.push({
             title: it.title,
-            source: (discovery && it.source_name) || def.name,
+            // Bing / Google : préférer le nom du journal (News:Source / <source>)
+            source: it.source_name || def.name,
             url: it.url,
             published_at: it.published_at,
             age_hours: age === null ? null : Math.round(age * 10) / 10,
@@ -506,6 +560,14 @@ export const tool: IrisTool = {
       query: query || null,
       zone,
       since_hours: sinceHours,
+      recherche:
+        wantBing && query && wantGoogle
+          ? 'les_deux'
+          : wantBing && query
+            ? 'bing'
+            : wantGoogle && query
+              ? 'google'
+              : 'aucune',
       items,
       decouverte,
       recoupement,

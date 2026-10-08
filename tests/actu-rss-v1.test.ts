@@ -395,4 +395,126 @@ describe('actu-rss-v1', () => {
     );
     expect(casse.title).toBe('(sans titre)');
   });
+
+  // --- Bing / recherche (ADR-0008) ---
+
+  function bingItem(title: string, editor: string, source: string) {
+    const apiclick = `http://www.bing.com/news/apiclick?articleid=1&url=${encodeURIComponent(editor)}&from=RSS`;
+    return {
+      title,
+      link: apiclick,
+      extra: `<News:Source>${source}</News:Source>`,
+    };
+  }
+
+  it('recherche=bing : items editeur, pas decouverte, interval 7 si since<=24', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('bing.com/news')) {
+        return okText(
+          url,
+          rss([
+            bingItem('Greve tram Strasbourg', 'https://www.dna.fr/tram', 'DNA'),
+            bingItem('Greve nationale', 'https://www.lemonde.fr/greve', 'Le Monde'),
+          ]),
+        );
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({
+      zone: 'alsace',
+      query: 'greve',
+      recherche: 'bing',
+      since_hours: 24,
+      limit: 5,
+    });
+    expect(payload.recherche).toBe('bing');
+    expect(payload.decouverte).toHaveLength(0);
+    expect(payload.items.length).toBeGreaterThanOrEqual(2);
+    expect(payload.items.every((i: { url: string }) => i.url.startsWith('https://'))).toBe(
+      true,
+    );
+    expect(payload.items.map((i: { source: string }) => i.source)).toEqual(
+      expect.arrayContaining(['DNA', 'Le Monde']),
+    );
+    const bingUrl = mockFetch.mock.calls.map((c) => String(c[0])).find((u) =>
+      u.includes('bing.com'),
+    );
+    expect(bingUrl).toMatch(/format=rss/);
+    expect(bingUrl).toMatch(/interval%3D%227%22|interval%3D"7"/);
+    expect(payload.feeds.some((f: { id: string }) => f.id === 'bing-news')).toBe(
+      true,
+    );
+  });
+
+  it('recherche=bing since>24 → interval 8', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('bing.com')
+        ? okText(url, rss([bingItem('X', 'https://www.dna.fr/x', 'DNA')]))
+        : okText(url, rss([])),
+    );
+    await run({
+      zone: 'alsace',
+      query: 'x',
+      recherche: 'bing',
+      since_hours: 48,
+    });
+    const bingUrl = mockFetch.mock.calls.map((c) => String(c[0])).find((u) =>
+      u.includes('bing.com'),
+    );
+    expect(bingUrl).toMatch(/interval%3D%228%22|interval%3D"8"/);
+  });
+
+  it('recherche=bing sans query : pas d appel, feeds[] le dit', async () => {
+    mockFetch.mockResolvedValue(okText('https://www.dna.fr/rss', SAMPLE_RSS));
+    const payload = await run({ zone: 'alsace', recherche: 'bing' });
+    const urls = mockFetch.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('bing.com'))).toBe(false);
+    const b = payload.feeds.find((f: { id: string }) => f.id === 'bing-news');
+    expect(b.status).toBe('erreur');
+    expect(payload.recherche).toBe('aucune');
+  });
+
+  it('recherche=les_deux : Bing en items, Google en decouverte', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('bing.com')) {
+        return okText(
+          url,
+          rss([bingItem('Greve Bing', 'https://www.dna.fr/bing', 'DNA')]),
+        );
+      }
+      if (url.includes('news.google.com')) {
+        return okText(
+          url,
+          rss([
+            {
+              title: 'Greve Google - RMC',
+              link: 'https://news.google.com/rss/articles/X1',
+              extra: '<source url="https://rmc.bfmtv.com">RMC</source>',
+            },
+          ]),
+        );
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({
+      zone: 'alsace',
+      query: 'greve',
+      recherche: 'les_deux',
+      limit: 5,
+    });
+    expect(payload.recherche).toBe('les_deux');
+    expect(payload.items.some((i: { url: string }) => i.url === 'https://www.dna.fr/bing')).toBe(
+      true,
+    );
+    expect(payload.decouverte.some((i: { source: string }) => i.source === 'RMC')).toBe(
+      true,
+    );
+  });
+
+  it('schema accepte recherche bing/google/les_deux', () => {
+    const schema = z.object(actu.inputSchema);
+    expect(schema.safeParse({ recherche: 'bing' }).success).toBe(true);
+    expect(schema.safeParse({ recherche: 'les_deux' }).success).toBe(true);
+    expect(schema.safeParse({ recherche: 'yahoo' }).success).toBe(false);
+  });
 });
