@@ -1,4 +1,4 @@
-# Catalogue des outils MCP - iris-mcp-server v0.10.0
+# Catalogue des outils MCP - iris-mcp-server v0.10.1
 
 29 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
@@ -183,7 +183,7 @@ Ajoutes en v0.5.0 (+ `actu-rss-v1` en v0.10.0). Sans cle API. Regles reseau : [s
 | `fetch-url-v1` | `fetch-url-v1.ts` | GET https direct, garde SSRF, texte plafonne (HTML converti en texte) |
 | `web-search-ddg-v1` | `web-search-ddg-v1.ts` | DuckDuckGo Instant Answer (api.duckduckgo.com) |
 | `wikipedia-search-v1` | `wikipedia-search-v1.ts` | API MediaWiki (`<lang>.wikipedia.org`) |
-| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (franceinfo, Le Monde, F3 Grand Est, DNA, L'Alsace, ActuIA, Pixels, Siecle Digital) + option Google Actualites (decouverte) |
+| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times) + Google decouverte (Guadeloupe, IA Asie, option query) |
 
 Entrees / sorties principales :
 
@@ -192,7 +192,7 @@ Entrees / sorties principales :
 | `fetch-url-v1` | `url` (https), `max_chars` (200 a 200000) | `url`, `final_url`, `status`, `content_type`, `format`, `text`, `truncated`, `bytes_approx`, `redirects` |
 | `web-search-ddg-v1` | `query` (1-200), `limit` (1-8, defaut 5) | `query`, `source`, `count`, `results[]` (`title`, `url`, `snippet`), `note` si vide |
 | `wikipedia-search-v1` | `query` (1-200), `lang` (defaut `fr`), `limit` (1-8, defaut 5) | `query`, `lang`, `count`, `total_hits`, `results[]` (`title`, `pageid`, `url`, `snippet`) |
-| `actu-rss-v1` | `zone` (france/alsace/ia/monde/tout), `query` optionnel, `limit` (1-20), `window_hours` (1-168), `google_news` (bool) | `articles[]` (titre, lien, source, date, resume court), `decouverte[]` si Google, `feeds_ok` / `feeds_ko`, `note` |
+| `actu-rss-v1` | `zone` (france/alsace/ia/monde/guadeloupe/usa/asie_ia/tout), `query` optionnel, `limit` (1-30), `since_hours` (1-168), `google_news` (bool) | `items[]`, `decouverte[]`, `feeds[]`, `recoupement`, `note` |
 
 Limite connue : `web-search-ddg-v1` s'appuie sur l'API Instant Answer, qui n'est pas un
 index web complet. Sur une requete pointue elle peut ne rien retourner : l'outil renvoie

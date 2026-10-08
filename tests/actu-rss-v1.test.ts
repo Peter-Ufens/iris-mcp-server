@@ -253,6 +253,92 @@ describe('actu-rss-v1', () => {
     expect(schema.safeParse({ query: 'x'.repeat(121) }).success).toBe(false);
   });
 
+  it('zones guadeloupe / usa / asie_ia acceptees par le schema', () => {
+    const schema = z.object(actu.inputSchema);
+    expect(schema.safeParse({ zone: 'guadeloupe' }).success).toBe(true);
+    expect(schema.safeParse({ zone: 'usa' }).success).toBe(true);
+    expect(schema.safeParse({ zone: 'asie_ia' }).success).toBe(true);
+  });
+
+  it('zone guadeloupe : filtre defaut Guadeloupe + flux decouverte fixe', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('news.google.com')) {
+        return okText(
+          url,
+          rss([
+            {
+              title: 'Coupure électrique en Guadeloupe',
+              link: 'https://news.google.com/rss/articles/G1',
+              extra: '<source url="https://la1ere.franceinfo.fr">la1ere</source>',
+            },
+          ]),
+        );
+      }
+      return okText(
+        url,
+        rss([
+          { title: 'Grève en Guadeloupe ce matin', link: 'https://www.franceinfo.fr/gwad' },
+          { title: 'Budget national voté', link: 'https://www.franceinfo.fr/budget' },
+        ]),
+      );
+    });
+    const payload = await run({ zone: 'guadeloupe', limit: 5 });
+    expect(payload.query).toBe('Guadeloupe');
+    expect(payload.items.every((i: { title: string }) => /guadeloupe/i.test(i.title))).toBe(
+      true,
+    );
+    expect(payload.decouverte.length).toBeGreaterThanOrEqual(1);
+    const urls = mockFetch.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('Guadeloupe'))).toBe(true);
+  });
+
+  it('zone usa appelle BBC et NYT', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      okText(url, rss([{ title: 'US Senate vote', link: `${url}/item1` }])),
+    );
+    const payload = await run({ zone: 'usa', limit: 5 });
+    expect(payload.error).toBeUndefined();
+    const ids = payload.feeds.map((f: { id: string }) => f.id);
+    expect(ids).toContain('bbc-us-canada');
+    expect(ids).toContain('nyt-us');
+  });
+
+  it('zone asie_ia appelle TechCrunch, Verge, CNA, Japan Times + Google', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      const tag = url.includes('techcrunch')
+        ? 'tc'
+        : url.includes('theverge')
+          ? 'verge'
+          : url.includes('channelnewsasia')
+            ? 'cna'
+            : url.includes('japantimes')
+              ? 'jt'
+              : 'ggl';
+      return okText(
+        url,
+        rss([
+          {
+            title: `AI chip Asia ${tag}`,
+            link: `https://example.com/${tag}/ai`,
+          },
+        ]),
+      );
+    });
+    const payload = await run({ zone: 'asie_ia', limit: 8 });
+    expect(payload.error).toBeUndefined();
+    const ids = payload.feeds.map((f: { id: string }) => f.id);
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'techcrunch-ai',
+        'verge-ai',
+        'cna-asia',
+        'japan-times',
+        'google-asie-ia',
+      ]),
+    );
+    expect(payload.decouverte.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('refuse les liens non https et titres gabarit casses', async () => {
     const xml = rss([
       { title: 'OK https', link: 'https://www.dna.fr/ok' },

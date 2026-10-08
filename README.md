@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.10.0` · **29 outils** · **313 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.10.1` · **29 outils** · **317 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -21,7 +21,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 29 outils MCP operationnels | OK, testes (Vitest 313/313) |
+| 29 outils MCP operationnels | OK, testes (Vitest 317/317) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
@@ -65,7 +65,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.10.0 - 29)
+## Outils disponibles (v0.10.1 - 29)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -93,7 +93,7 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `fetch-url-v1` | web | Contenu texte d'une URL https (garde SSRF, plafonds) |
 | `web-search-ddg-v1` | web | Recherche DuckDuckGo Instant Answer (sans cle) |
 | `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
-| `actu-rss-v1` | web | Titres / liens actualite (flux RSS fixes, zones france/alsace/ia) |
+| `actu-rss-v1` | web | Titres / liens actualite (flux fixes : france/alsace/ia/guadeloupe/usa/asie_ia) |
 | `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
 | `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
 | `rag-hybrid-v1` | memory | RAG vectoriel + lexical : identifiants, noms de fichier, fautes de frappe |
@@ -121,7 +121,7 @@ iris-mcp-server/
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       ├── html-text.ts      # HTML vers texte
 │       └── rss-parse.ts      # Lecteur RSS/Atom maison (actu-rss-v1)
-├── tests/                    # Vitest (313 tests)
+├── tests/                    # Vitest (317 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json
