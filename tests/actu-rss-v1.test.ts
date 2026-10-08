@@ -260,16 +260,18 @@ describe('actu-rss-v1', () => {
     expect(schema.safeParse({ zone: 'asie_ia' }).success).toBe(true);
   });
 
-  it('zone guadeloupe : filtre defaut Guadeloupe + flux decouverte fixe', async () => {
+  it('zone guadeloupe : La 1ère + decouverte, sans filtre implicite qui jette les communes', async () => {
+    // Review Bob 08/10 : l'ancien filtre "Guadeloupe" par defaut jetait 21 articles
+    // Google sur 100 et 13 articles La 1ère sur 30 (titres qui ne citent que la commune).
     mockFetch.mockImplementation(async (url: string) => {
       if (url.includes('news.google.com')) {
         return okText(
           url,
           rss([
             {
-              title: 'Coupure électrique en Guadeloupe',
+              title: 'Municipales au Gosier : le scrutin annulé - Outre-mer La 1ère',
               link: 'https://news.google.com/rss/articles/G1',
-              extra: '<source url="https://la1ere.franceinfo.fr">la1ere</source>',
+              extra: '<source url="https://la1ere.franceinfo.fr">Outre-mer La 1ère</source>',
             },
           ]),
         );
@@ -277,19 +279,52 @@ describe('actu-rss-v1', () => {
       return okText(
         url,
         rss([
-          { title: 'Grève en Guadeloupe ce matin', link: 'https://www.franceinfo.fr/gwad' },
-          { title: 'Budget national voté', link: 'https://www.franceinfo.fr/budget' },
+          { title: 'Mobilisation devant les lycées des Abymes', link: 'https://la1ere.franceinfo.fr/guadeloupe/abymes' },
+          { title: 'Coupure électrique en Guadeloupe', link: 'https://la1ere.franceinfo.fr/guadeloupe/edf' },
         ]),
       );
     });
     const payload = await run({ zone: 'guadeloupe', limit: 5 });
-    expect(payload.query).toBe('Guadeloupe');
-    expect(payload.items.every((i: { title: string }) => /guadeloupe/i.test(i.title))).toBe(
-      true,
-    );
-    expect(payload.decouverte.length).toBeGreaterThanOrEqual(1);
+    expect(payload.query).toBeNull();
+    expect(payload.items).toHaveLength(2);
+    expect(payload.items.every((i: { source: string }) => i.source === 'Guadeloupe La 1ère')).toBe(true);
+    expect(payload.decouverte[0].title).toMatch(/Gosier/);
     const urls = mockFetch.mock.calls.map((c) => String(c[0]));
-    expect(urls.some((u) => u.includes('Guadeloupe'))).toBe(true);
+    expect(urls.some((u) => u.includes('la1ere.franceinfo.fr/guadeloupe/last-articles/rss'))).toBe(true);
+    expect(urls.some((u) => u.includes('franceinfo.fr/titres.rss'))).toBe(false);
+  });
+
+  it('zone asie_ia : seulement les articles a la fois IA et Asie', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('channelnewsasia')) {
+        return okText(url, rss([
+          { title: 'Bollywood actor dies at 75', link: 'https://cna.example/1' },
+          { title: 'Singapore regulator expands use of AI', link: 'https://cna.example/2' },
+        ]));
+      }
+      if (url.includes('techcrunch')) {
+        return okText(url, rss([
+          { title: 'Microsoft releases new AI PCs', link: 'https://tc.example/1' },
+          { title: 'DeepSeek ships 16 new models in China', link: 'https://tc.example/2' },
+        ]));
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({ zone: 'asie_ia', limit: 10 });
+    const titles = payload.items.map((i: { title: string }) => i.title).sort();
+    expect(titles).toEqual(['DeepSeek ships 16 new models in China', 'Singapore regulator expands use of AI']);
+    expect(payload.items.every((i: { zone: string }) => i.zone === 'asie_ia')).toBe(true);
+  });
+
+  it('le filtre asie_ia ne s applique pas en zone ia', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('techcrunch')
+        ? okText(url, rss([{ title: 'Microsoft releases new AI PCs', link: 'https://tc.example/1' }]))
+        : okText(url, rss([])),
+    );
+    const payload = await run({ zone: 'ia', limit: 10 });
+    expect(payload.items.map((i: { title: string }) => i.title)).toContain('Microsoft releases new AI PCs');
+    expect(payload.items.every((i: { zone: string }) => i.zone === 'ia')).toBe(true);
   });
 
   it('zone usa appelle BBC et NYT', async () => {

@@ -32,7 +32,7 @@ pas de texte integral d'article.
 | Plafond | Valeur |
 |---|---|
 | Timeout | 10 s |
-| Texte retourne | 200 000 caracteres max (`max_chars` peut baisser ce plafond) |
+| Texte retourne | 200 000 caracteres max (`max_chars` peut baisser ce plafond ; il s'applique au texte rendu, apres conversion HTML, pour garder le corps de la page) |
 | Lecture reseau | Flux interrompu des le plafond atteint |
 | Troncature | Signalee par `truncated: true` |
 | User-Agent | `iris-mcp-server/<version>` (pas d'usurpation de navigateur) |

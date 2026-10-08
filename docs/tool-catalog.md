@@ -1,4 +1,4 @@
-# Catalogue des outils MCP - iris-mcp-server v0.10.1
+# Catalogue des outils MCP - iris-mcp-server v0.10.2
 
 29 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
@@ -183,7 +183,7 @@ Ajoutes en v0.5.0 (+ `actu-rss-v1` en v0.10.0). Sans cle API. Regles reseau : [s
 | `fetch-url-v1` | `fetch-url-v1.ts` | GET https direct, garde SSRF, texte plafonne (HTML converti en texte) |
 | `web-search-ddg-v1` | `web-search-ddg-v1.ts` | DuckDuckGo Instant Answer (api.duckduckgo.com) |
 | `wikipedia-search-v1` | `wikipedia-search-v1.ts` | API MediaWiki (`<lang>.wikipedia.org`) |
-| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times) + Google decouverte (Guadeloupe, IA Asie, option query) |
+| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + La 1ere Guadeloupe + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times, zone `asie_ia` filtree IA et Asie) + Google decouverte (Guadeloupe, IA Asie, option query) |
 
 Entrees / sorties principales :
 
