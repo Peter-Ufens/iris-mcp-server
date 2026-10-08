@@ -22,7 +22,7 @@ export const tool: IrisTool = {
     'Convertit un nom de ville en coordonnees GPS (latitude, longitude, fuseau horaire). Open-Meteo Geocoding, gratuit, sans cle API.',
   category: 'cloud',
   inputSchema: {
-    city: z.string().describe('Nom de la ville (ex: Paris, Haguenau)'),
+    city: z.string().describe('Nom de la ville (ex: Paris, Lyon)'),
     language: z
       .string()
       .optional()

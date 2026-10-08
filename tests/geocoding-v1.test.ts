@@ -18,19 +18,19 @@ describe('geocoding-v1', () => {
     mockFetch.mockResolvedValue({
       results: [
         {
-          name: 'Haguenau',
-          latitude: 48.82,
-          longitude: 7.79,
+          name: 'Lyon',
+          latitude: 45.75,
+          longitude: 4.85,
           country: 'France',
           timezone: 'Europe/Paris',
           country_code: 'FR',
         },
       ],
     });
-    const result = await tool.execute({ city: 'Haguenau', language: 'fr' });
+    const result = await tool.execute({ city: 'Lyon', language: 'fr' });
     const payload = JSON.parse(result.content[0]!.text);
-    expect(payload.city).toBe('Haguenau');
-    expect(payload.latitude).toBe(48.82);
+    expect(payload.city).toBe('Lyon');
+    expect(payload.latitude).toBe(45.75);
     expect(payload.timezone).toBe('Europe/Paris');
   });
 

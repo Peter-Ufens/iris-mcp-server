@@ -9,6 +9,11 @@ potentiellement par un LLM). C'est la seule surface SSRF du serveur : les autres
 construisent leurs URL eux-memes. La garde est dans `src/utils/url-guard.ts` et
 `src/utils/http-fetch.ts`.
 
+Depuis la v0.10.0, `actu-rss-v1` lit des **flux RSS fixes** (liste dans le code) et,
+si demande, une URL Google Actualites construite serveur-side. **Aucune URL client.**
+Regles ADR-0006 (hub Iris-MCP) : titres / liens / resume court, usage personnel,
+pas de texte integral d'article.
+
 ## Ce qui est refuse
 
 | Regle | Detail |

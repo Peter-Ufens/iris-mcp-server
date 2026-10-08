@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-09-22) :** **v0.9.0** · **28 outils** · **283 tests** · repo **public** GitHub.  
-> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Projet hub Iris-MCP = **`cloture`**.
+> **Etat live (2026-10-08) :** **v0.10.0** · **29 outils** · **313 tests** · repo **public** GitHub.  
+> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** puis recloture apres G3.
 
 ---
 
-## Etat present : v0.9.0 (septembre 2026)
+## Etat present : v0.10.0 (octobre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -17,6 +17,7 @@
 | v0.6.0–0.7.0 | RAG vault : `rag-query-v1`, `rag-search-v2`, `rag-hybrid-v1` | ✅ |
 | v0.8.0 | `rag-journal-link-v1` (journal recherches opt-in) | ✅ |
 | v0.9.0 | zone contentieux + `includeContentieux` | ✅ |
+| v0.10.0 | `time-v1` local (`iris`) · `actu-rss-v1` (flux fixes + Google decouverte) · parseur RSS maison | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
 
@@ -74,7 +75,7 @@ couvrant pas tout le web.
 
 ---
 
-## Securite (etat reel v0.9.0)
+## Securite (etat reel v0.10.0)
 
 iris-mcp-server suit les bonnes pratiques MCP quand c'est applicable en **mode lab local** :
 
@@ -102,8 +103,8 @@ npx @modelcontextprotocol/inspector node dist/index.js
 ### Complement CLI (parké, hub 2026-09-02)
 
 CLI mince **optionnel** (ping, list-tools, debug) reutilisant les modules `src/`,
-sans refaire les 28 outils en commandes. MCP reste le canal principal pour les clients IA.
-Detail : hub `planning/backlog-cli-iris-2026-09-02.md` (projet Iris-MCP **`cloture`**).
+sans refaire les 29 outils en commandes. MCP reste le canal principal pour les clients IA.
+Detail : hub `planning/backlog-cli-iris-2026-09-02.md`.
 
 ## Hors scope (projets separes)
 
@@ -120,4 +121,4 @@ Detail : hub `planning/backlog-cli-iris-2026-09-02.md` (projet Iris-MCP **`clotu
 
 ---
 
-*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2) · MAJ lot web v0.5.0 : 2026-08-07 Claude Code · MAJ v0.9.0 live : 2026-09-22 Karen.*
+*Roadmap initiale : 2026-05-03 Sharon · MAJ etat live : 2026-07-27 Karen (audit V2) · MAJ lot web v0.5.0 : 2026-08-07 Claude Code · MAJ v0.9.0 live : 2026-09-22 Karen · MAJ v0.10.0 actu RSS : 2026-10-08 Karen.*
