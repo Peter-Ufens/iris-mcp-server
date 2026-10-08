@@ -28,7 +28,17 @@ interface FeedDef {
   url: string;
   zones: Zone[];
   kind: 'publisher' | 'discovery';
+  /** Filtre propre a une zone : l'article doit aussi parler de ce theme. */
+  zoneFilter?: Partial<Record<Zone, RegExp>>;
 }
+
+// Zone asie_ia = intersection IA ET Asie. Les flux IA (TechCrunch, Verge) parlent
+// surtout des Etats-Unis, les flux Asie (CNA, Japan Times) surtout d'autre chose :
+// sans filtre, 1 article sur 30 seulement etait a la fois IA et Asie (review Bob 08/10).
+const AI_RE =
+  /\b(ai|artificial intelligence|generative|chatbots?|llms?|machine learning|deepseek|openai|anthropic|nvidia|chips?|semiconductors?|gpus?|data cent(?:re|er)s?|robots?|robotics)\b/i;
+const ASIA_RE =
+  /\b(asia|asian|asean|china|chinese|beijing|shanghai|shenzhen|hong kong|taiwan|taiwanese|japan|japanese|tokyo|osaka|korea|korean|seoul|singapore|india|indian|vietnam|indonesia|malaysia|thailand|philippines|alibaba|baidu|tencent|huawei|bytedance|xiaomi|samsung|sk hynix|softbank|tsmc|sony|deepseek)\b/i;
 
 /** Liste fixe (ADR-0006). Aucune URL client. Pas de ville personnelle. */
 const FEEDS: FeedDef[] = [
@@ -88,21 +98,22 @@ const FEEDS: FeedDef[] = [
     zones: ['ia', 'tout'],
     kind: 'publisher',
   },
-  // Guadeloupe : pas de RSS éditeur stable (la1ere renvoie du HTML).
-  // Découverte Google en URL fixe (pas d'URL client) + franceinfo titres.
+  // Guadeloupe : le flux regional La 1ere existe a l'adresse /last-articles/rss
+  // (/guadeloupe/rss redirige vers du HTML). Teste par Bob le 08/10 : 30 articles.
+  // + decouverte Google en URL fixe (pas d'URL client).
+  {
+    id: 'la1ere-guadeloupe',
+    name: 'Guadeloupe La 1ère',
+    url: 'https://la1ere.franceinfo.fr/guadeloupe/last-articles/rss',
+    zones: ['guadeloupe'],
+    kind: 'publisher',
+  },
   {
     id: 'google-guadeloupe',
     name: 'Google Actualités Guadeloupe',
     url: 'https://news.google.com/rss/search?q=Guadeloupe+when:2d&hl=fr&gl=FR&ceid=FR:fr',
     zones: ['guadeloupe'],
     kind: 'discovery',
-  },
-  {
-    id: 'franceinfo-guadeloupe',
-    name: 'franceinfo',
-    url: 'https://www.franceinfo.fr/titres.rss',
-    zones: ['guadeloupe'],
-    kind: 'publisher',
   },
   {
     id: 'bbc-us-canada',
@@ -124,6 +135,7 @@ const FEEDS: FeedDef[] = [
     url: 'https://techcrunch.com/category/artificial-intelligence/feed/',
     zones: ['asie_ia', 'ia', 'tout'],
     kind: 'publisher',
+    zoneFilter: { asie_ia: ASIA_RE },
   },
   {
     id: 'verge-ai',
@@ -131,6 +143,7 @@ const FEEDS: FeedDef[] = [
     url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml',
     zones: ['asie_ia', 'ia', 'tout'],
     kind: 'publisher',
+    zoneFilter: { asie_ia: ASIA_RE },
   },
   {
     id: 'cna-asia',
@@ -138,6 +151,7 @@ const FEEDS: FeedDef[] = [
     url: 'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511',
     zones: ['asie_ia', 'monde', 'tout'],
     kind: 'publisher',
+    zoneFilter: { asie_ia: AI_RE },
   },
   {
     id: 'japan-times',
@@ -145,6 +159,7 @@ const FEEDS: FeedDef[] = [
     url: 'https://www.japantimes.co.jp/feed/topstories/',
     zones: ['asie_ia', 'monde', 'tout'],
     kind: 'publisher',
+    zoneFilter: { asie_ia: AI_RE },
   },
   {
     id: 'google-asie-ia',
@@ -156,7 +171,7 @@ const FEEDS: FeedDef[] = [
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités (liens non citables comme source éditeur). Zone ia = ActuIA/Pixels/Siècle Digital (+ TechCrunch/Verge si tout). Zone guadeloupe = Google découverte fixe + franceinfo (pas de RSS la1ere stable). Zone usa = BBC US + NYT US. Zone asie_ia = TechCrunch AI, Verge AI, CNA, Japan Times + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités (liens non citables comme source éditeur). Zone ia = ActuIA/Pixels/Siècle Digital (+ TechCrunch/Verge si tout). Zone guadeloupe = La 1ère Guadeloupe + Google découverte. Zone usa = BBC US + NYT US. Zone asie_ia = articles à la fois IA et Asie (TechCrunch AI, Verge AI, CNA, Japan Times filtrés) + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -259,11 +274,9 @@ export const tool: IrisTool = {
   },
   execute: async (input) => {
     const zone = ((input.zone as Zone | undefined) ?? 'tout') as Zone;
-    // Guadeloupe : sans RSS éditeur local stable, le filtre défaut évite
-    // que franceinfo national noie la zone (découverte Google reste la base).
-    const queryRaw = (input.query as string | undefined)?.trim() || '';
-    const query =
-      queryRaw || (zone === 'guadeloupe' ? 'Guadeloupe' : '');
+    // Pas de requete implicite : un filtre "Guadeloupe" par defaut jetait les
+    // articles guadeloupeens qui ne citent que la commune (Gosier, Abymes...).
+    const query = (input.query as string | undefined)?.trim() || '';
     const sinceHours = (input.since_hours as number | undefined) ?? 48;
     const limit = (input.limit as number | undefined) ?? 10;
     const googleNews = (input.google_news as boolean | undefined) ?? false;
@@ -389,10 +402,16 @@ export const tool: IrisTool = {
           status: 'ok',
           count: items.length,
         });
+        // Zone demandee si precise ; sinon la 1re zone du flux (TechCrunch en zone ia
+        // etait etiquete asie_ia, BBC en zone monde etiquete usa).
         const primaryZone =
-          (def.zones.find((z) => z !== 'tout') as Zone | undefined) ?? zone;
+          zone !== 'tout'
+            ? zone
+            : ((def.zones.find((z) => z !== 'tout') as Zone | undefined) ?? zone);
+        const zoneFilter = def.zoneFilter?.[zone];
         for (const it of items) {
           if (!it.url || !/^https:\/\//i.test(it.url)) continue;
+          if (zoneFilter && !zoneFilter.test(`${it.title} ${it.summary}`)) continue;
           const discovery =
             def.kind === 'discovery' || isGoogleNewsUrl(it.url);
           const age = ageHours(it.published_at, now);

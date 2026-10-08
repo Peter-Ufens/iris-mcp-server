@@ -141,6 +141,17 @@ describe('fetch-url-v1 : plafond de taille', () => {
     expect(Number(payload.bytes_approx)).toBeGreaterThan(0);
   });
 
+  it('max_chars coupe le texte rendu, pas le HTML brut (le corps reste lisible)', async () => {
+    // En-tete lourd (scripts) avant le corps, comme les pages de presse reelles
+    const head = `<head><title>Titre</title><script>${'var a=1;'.repeat(2_000)}</script></head>`;
+    const body = '<body><article><p>CORPS DE L ARTICLE</p></article></body>';
+    mockFetch.mockResolvedValue(response(`<html>${head}${body}</html>`, 'text/html; charset=utf-8'));
+    const payload = payloadOf(await tool.execute({ url: 'https://example.com/article', max_chars: 1000 }));
+    expect(String(payload.text)).toContain('CORPS DE L ARTICLE');
+    expect(String(payload.text)).not.toContain('var a=1');
+    expect(payload.truncated).toBe(false);
+  });
+
   it('ne signale pas de troncature sous le plafond', async () => {
     mockFetch.mockResolvedValue(response('petit contenu'));
     const payload = payloadOf(await tool.execute({ url: 'https://example.com/petit' }));

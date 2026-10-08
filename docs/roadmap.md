@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-10-08) :** **v0.10.1** · **29 outils** · **317 tests** · repo **public** GitHub.  
+> **Etat live (2026-10-08) :** **v0.10.2** · **29 outils** · **320 tests** · repo **public** GitHub.  
 > Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** puis recloture apres G3.
 
 ---
 
-## Etat present : v0.10.1 (octobre 2026)
+## Etat present : v0.10.2 (octobre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -19,6 +19,7 @@
 | v0.9.0 | zone contentieux + `includeContentieux` | ✅ |
 | v0.10.0 | `time-v1` local (`iris`) · `actu-rss-v1` (flux fixes + Google decouverte) · parseur RSS maison | ✅ |
 | v0.10.1 | zones `guadeloupe` / `usa` / `asie_ia` + flux associes | ✅ |
+| v0.10.2 | La 1ère Guadeloupe · filtre asie_ia (IA∩Asie) · fetch-url coupe le texte rendu | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
 

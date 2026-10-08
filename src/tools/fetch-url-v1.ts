@@ -30,17 +30,21 @@ export const tool: IrisTool = {
     const maxChars = input.max_chars as number | undefined;
 
     try {
-      const res = await fetchText(url, { maxChars });
+      // max_chars plafonne le TEXTE rendu : on telecharge jusqu au plafond global,
+      // on convertit, puis on coupe. Couper le HTML brut d abord ne gardait que
+      // l en-tete (<head>, scripts a moitie coupes) et jamais le corps de l article.
+      const res = await fetchText(url);
       const html = isHtmlContentType(res.contentType);
+      const full = html ? htmlToText(res.text) : res.text;
+      const text = full.slice(0, maxChars ?? MAX_TEXT_CHARS);
       return jsonResult({
         url: res.url,
         final_url: res.finalUrl,
         status: res.status,
         content_type: res.contentType,
-        // Le plafond s applique au corps brut : apres conversion HTML, le texte est plus court.
         format: html ? 'html_vers_texte' : 'brut',
-        text: html ? htmlToText(res.text) : res.text,
-        truncated: res.truncated,
+        text,
+        truncated: res.truncated || text.length < full.length,
         bytes_approx: res.bytesApprox,
         redirects: res.redirects,
       });
