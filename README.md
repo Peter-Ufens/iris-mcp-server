@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.11.1` · **29 outils** · **333 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.11.2` · **29 outils** · **335 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -21,7 +21,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 29 outils MCP operationnels | OK, testes (Vitest 333/333) |
+| 29 outils MCP operationnels | OK, testes (Vitest 335/335) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
@@ -65,7 +65,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.11.1 - 29)
+## Outils disponibles (v0.11.2 - 29)
 
 | ID | Categorie | Description courte |
 |---|---|---|
@@ -121,7 +121,7 @@ iris-mcp-server/
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       ├── html-text.ts      # HTML vers texte
 │       └── rss-parse.ts      # Lecteur RSS/Atom maison (actu-rss-v1)
-├── tests/                    # Vitest (333 tests)
+├── tests/                    # Vitest (335 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json

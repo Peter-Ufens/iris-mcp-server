@@ -1,4 +1,4 @@
-# Catalogue des outils MCP - iris-mcp-server v0.11.1
+# Catalogue des outils MCP - iris-mcp-server v0.11.2
 
 29 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
