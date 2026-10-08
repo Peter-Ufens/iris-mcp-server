@@ -2,3 +2,7 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
+
+# Regles Cursor = hub Iris-MCP seulement (pas le repo public)
+.cursor/
+
