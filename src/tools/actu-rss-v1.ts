@@ -28,6 +28,8 @@ interface FeedDef {
   url: string;
   zones: Zone[];
   kind: 'publisher' | 'discovery';
+  /** Recherche par mots-cles (Bing, Google) : nationale, deja filtree par le moteur. */
+  search?: true;
   /** Filtre propre a une zone : l'article doit aussi parler de ce theme. */
   zoneFilter?: Partial<Record<Zone, RegExp>>;
 }
@@ -171,7 +173,7 @@ const FEEDS: FeedDef[] = [
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel / non commercial. Lire l’article (fetch-url-v1) avant d’affirmer un fait. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] liens éditeur ; Google → decouverte[]). Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte fixe. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel / non commercial. Lire l’article (fetch-url-v1) avant d’affirmer un fait. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] liens éditeur ; Google → decouverte[]) : recherche nationale, la zone ne s’y applique pas (zone « tout »). Heure Bing approximative (date_approx) : lire la date sur la page de l’éditeur avant d’affirmer une heure. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte fixe. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -345,6 +347,7 @@ export const tool: IrisTool = {
           url: googleNewsUrl(query),
           zones: ['tout'],
           kind: 'discovery',
+          search: true,
         },
         url: googleNewsUrl(query),
       });
@@ -359,6 +362,7 @@ export const tool: IrisTool = {
           zones: ['tout'],
           // Lien éditeur décodé → items[] citables (ADR-0008)
           kind: 'publisher',
+          search: true,
         },
         url: bingUrl,
       });
@@ -407,6 +411,7 @@ export const tool: IrisTool = {
       discovery: boolean;
       date_inconnue: boolean;
       date_douteuse?: true;
+      date_approx?: true;
       date_url?: string;
       domain: string;
       normTitle: string;
@@ -457,8 +462,11 @@ export const tool: IrisTool = {
         });
         // Zone demandee si precise ; sinon la 1re zone du flux (TechCrunch en zone ia
         // etait etiquete asie_ia, BBC en zone monde etiquete usa).
-        const primaryZone =
-          zone !== 'tout'
+        // Recherche Bing / Google = nationale : jamais etiquetee avec la zone demandee
+        // (Sud Ouest ou La Voix du Nord sortaient en zone « alsace », review Bob 08/10).
+        const primaryZone = def.search
+          ? 'tout'
+          : zone !== 'tout'
             ? zone
             : ((def.zones.find((z) => z !== 'tout') as Zone | undefined) ?? zone);
         const zoneFilter = def.zoneFilter?.[zone];
@@ -470,6 +478,9 @@ export const tool: IrisTool = {
           const age = ageHours(it.published_at, now);
           const date_inconnue = !it.published_at;
           if (!date_inconnue && age !== null && age > sinceHours) continue;
+          // Les resultats Bing / Google sont AUSSI filtres sur les mots : sans ce filtre,
+          // le piege « virus quarantaine population mondiale » remontait 7 articles reels
+          // (Ebola au Kenya) et Google 6 hors-sujet sur 10 pour « Gosier » (mesure Bob 08/10).
           if (query && !matchesQuery(it, query)) continue;
           const dateUrl = dateFromUrl(it.url);
           const republie =
@@ -488,6 +499,9 @@ export const tool: IrisTool = {
             discovery,
             date_inconnue,
             ...(republie ? { date_douteuse: true as const, date_url: dateUrl! } : {}),
+            // Heure Bing juste en moyenne, fausse de plusieurs heures sur certains
+            // articles (La Provence datee avant l'evenement, mesure Bob 08/10)
+            ...(def.id === 'bing-news' ? { date_approx: true as const } : {}),
             domain: domainOf(it.url),
             normTitle: dedupeKey(it.title, it.url),
           });

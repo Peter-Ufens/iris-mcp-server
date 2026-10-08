@@ -1,4 +1,4 @@
-# Catalogue des outils MCP - iris-mcp-server v0.11.0
+# Catalogue des outils MCP - iris-mcp-server v0.11.1
 
 29 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
 Chaque outil a un ID unique versionne (`<nom>-v<version>`).
@@ -192,14 +192,14 @@ Entrees / sorties principales :
 | `fetch-url-v1` | `url` (https), `max_chars` (200 a 200000) | `url`, `final_url`, `status`, `content_type`, `format`, `text`, `truncated`, `bytes_approx`, `redirects` |
 | `web-search-ddg-v1` | `query` (1-200), `limit` (1-8, defaut 5) | `query`, `source`, `count`, `results[]` (`title`, `url`, `snippet`), `note` si vide |
 | `wikipedia-search-v1` | `query` (1-200), `lang` (defaut `fr`), `limit` (1-8, defaut 5) | `query`, `lang`, `count`, `total_hits`, `results[]` (`title`, `pageid`, `url`, `snippet`) |
-| `actu-rss-v1` | `zone` (france/alsace/ia/monde/guadeloupe/usa/asie_ia/tout), `query` optionnel, `limit` (1-30), `since_hours` (1-168), `recherche` (aucune/google/bing/les_deux), `google_news` (bool, compat) | `items[]`, `decouverte[]`, `feeds[]`, `recoupement`, `recherche`, `note` |
+| `actu-rss-v1` | `zone` (france/alsace/ia/monde/guadeloupe/usa/asie_ia/tout), `query` optionnel, `limit` (1-30), `since_hours` (1-168), `recherche` (aucune/google/bing/les_deux), `google_news` (bool, compat) | `items[]` (Bing : `date_approx` si heure incertaine), `decouverte[]`, `feeds[]`, `recoupement`, `recherche`, `note` |
 
 Limite connue : `web-search-ddg-v1` s'appuie sur l'API Instant Answer, qui n'est pas un
 index web complet. Sur une requete pointue elle peut ne rien retourner : l'outil renvoie
 alors `results: []` et une `note`, pas une erreur.
 
 `actu-rss-v1` ne renvoie **pas** le texte integral des articles (titres + liens + resume court).
-Lire un article : `fetch-url-v1` sur le lien. Bing Actualites (voie B) → `items[]` avec lien editeur https. Google Actualites → `decouverte[]` seulement.
+Lire un article : `fetch-url-v1` sur le lien. Bing Actualites (voie B) → `items[]` avec lien editeur https · recherche nationale (`zone` sortie `tout`) · `date_approx: true` = heure Bing approximative (confirmer sur la page editeur). Google Actualites → `decouverte[]` seulement.
 
 ## Pattern d'ID
 

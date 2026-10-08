@@ -74,15 +74,24 @@ export function getTimeZoneOffsetMs(timeZone: string, date: Date): number {
   return sign * (Number(m[2]) * 60 + Number(m[3])) * 60_000;
 }
 
-/** pubDate Bing (GMT faux) → ISO UTC réel. Autres dates : parseFeedDate. */
-export function parseBingPubDate(raw: string | null | undefined): string | null {
+/**
+ * pubDate Bing (GMT faux) → ISO UTC réel. Autres dates : parseFeedDate.
+ * Garde-fou : si la correction place l'article plus d'1 h dans le futur, Bing a
+ * cessé d'écrire l'heure du Pacifique pour cet article : on garde l'heure brute.
+ */
+export function parseBingPubDate(
+  raw: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
   if (!raw || !raw.trim()) return null;
   const trimmed = raw.trim();
   if (!/GMT\s*$/i.test(trimmed)) return parseFeedDate(trimmed);
   const wrongAsUtc = Date.parse(trimmed);
   if (Number.isNaN(wrongAsUtc)) return null;
   const offset = getTimeZoneOffsetMs('America/Los_Angeles', new Date(wrongAsUtc));
-  return new Date(wrongAsUtc - offset).toISOString();
+  const corrected = wrongAsUtc - offset;
+  if (corrected > now + 3_600_000) return new Date(wrongAsUtc).toISOString();
+  return new Date(corrected).toISOString();
 }
 
 /**
@@ -102,9 +111,10 @@ export function decodeBingEditorUrl(link: string): string {
       return link;
     }
     if (!u.pathname.includes('/news/apiclick')) return link;
-    const raw = u.searchParams.get('url');
-    if (!raw) return link;
-    const decoded = decodeURIComponent(raw);
+    // searchParams.get decode deja une fois. Un 2e decodeURIComponent cassait
+    // les liens contenant un % (exception → lien perdu) ou un %25 / %2F.
+    const decoded = u.searchParams.get('url');
+    if (!decoded) return link;
     return /^https:\/\//i.test(decoded) ? decoded : link;
   } catch {
     return link;
@@ -159,6 +169,11 @@ export function dedupeKey(title: string, url: string): string {
 
 function parseRssItems(xml: string): ParsedFeedItem[] {
   const items: ParsedFeedItem[] = [];
+  // Bing : l'heure du Pacifique n'est ecrite que pour certains parametres de requete
+  // (sans setlang, Bing donne le vrai GMT : mesure Bob 08/10). Si un seul article du
+  // flux tomberait dans le futur une fois corrige, le flux est en vrai GMT : on ne
+  // corrige aucun article de ce flux.
+  const bingRaw: { item: ParsedFeedItem; pub: string }[] = [];
   const re = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
@@ -183,13 +198,22 @@ function parseRssItems(xml: string): ParsedFeedItem[] {
     if (!title && !url) continue;
     const sourceName =
       tagText(block, 'source') || tagText(block, 'News:Source');
-    items.push({
+    const item: ParsedFeedItem = {
       title: sanitizeTitle(title),
       url,
       published_at: fromBing ? parseBingPubDate(pub) : parseFeedDate(pub),
       summary: truncateSummary(summary),
       ...(sourceName ? { source_name: sourceName } : {}),
-    });
+    };
+    if (fromBing) bingRaw.push({ item, pub });
+    items.push(item);
+  }
+  const now = Date.now();
+  const fluxEnVraiGmt = bingRaw.some(
+    ({ pub }) => (Date.parse(parseBingPubDate(pub, Infinity) ?? '') || 0) > now + 3_600_000,
+  );
+  if (fluxEnVraiGmt) {
+    for (const { item, pub } of bingRaw) item.published_at = parseFeedDate(pub);
   }
   return items;
 }

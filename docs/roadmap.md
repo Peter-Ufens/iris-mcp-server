@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-10-08) :** **v0.11.0** · **29 outils** · **328 tests** · repo **public** GitHub.  
-> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** (voie B Bing livree).
+> **Etat live (2026-10-08) :** **v0.11.1** · **29 outils** · **333 tests** · repo **public** GitHub.  
+> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** (voie B Bing + review Bob).
 
 ---
 
-## Etat present : v0.11.0 (octobre 2026)
+## Etat present : v0.11.1 (octobre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -21,6 +21,7 @@
 | v0.10.1 | zones `guadeloupe` / `usa` / `asie_ia` + flux associes | ✅ |
 | v0.10.2 | La 1ère Guadeloupe · filtre asie_ia (IA∩Asie) · fetch-url coupe le texte rendu | ✅ |
 | v0.11.0 | Bing Actualites = voie B (`recherche=bing|les_deux`) · decode apiclick · heure Pacific | ✅ |
+| v0.11.1 | Review Bob Bing : garde-fous heure · decode unique · zone recherche `tout` · `date_approx` | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
 
