@@ -4,7 +4,10 @@ import {
   normalizeTitle,
   truncateSummary,
   parseFeedDate,
+  parseBingPubDate,
+  decodeBingEditorUrl,
   isGoogleNewsUrl,
+  isBingNewsUrl,
   sanitizeTitle,
   dedupeKey,
 } from '../src/utils/rss-parse.js';
@@ -78,5 +81,43 @@ describe('rss-parse', () => {
     expect(dedupeKey('Même titre', 'https://a.example/1')).toBe(
       dedupeKey('meme titre', 'https://b.example/2'),
     );
+  });
+
+  // --- Bing Actualités (ADR-0008) ---
+
+  it('decodeBingEditorUrl extrait le https editeur depuis apiclick', () => {
+    const raw =
+      'http://www.bing.com/news/apiclick?articleid=1&url=https%3A%2F%2Fwww.dna.fr%2Fgreve&from=RSS';
+    expect(decodeBingEditorUrl(raw)).toBe('https://www.dna.fr/greve');
+    expect(decodeBingEditorUrl('https://www.dna.fr/deja')).toBe(
+      'https://www.dna.fr/deja',
+    );
+  });
+
+  it('parseBingPubDate corrige GMT faux (Pacific) vers UTC', () => {
+    // 08 Oct 2026 06:00:00 « GMT » Bing = 06:00 America/Los_Angeles (PDT = UTC−7)
+    const iso = parseBingPubDate('Thu, 08 Oct 2026 06:00:00 GMT');
+    expect(iso).toBe('2026-10-08T13:00:00.000Z');
+    expect(parseBingPubDate('')).toBeNull();
+  });
+
+  it('parseFeedXml Bing : lien editeur + News:Source + date corrigee', () => {
+    const apiclick =
+      'http://www.bing.com/news/apiclick?articleid=9&url=https%3A%2F%2Fwww.lemonde.fr%2Fia&from=RSS';
+    const xml = `<?xml version="1.0"?><rss version="2.0"><channel>
+<item>
+  <title>IA en Asie</title>
+  <link>${apiclick}</link>
+  <pubDate>Thu, 08 Oct 2026 06:00:00 GMT</pubDate>
+  <News:Source>Le Monde</News:Source>
+  <description>Resume</description>
+</item>
+</channel></rss>`;
+    const items = parseFeedXml(xml);
+    expect(items).toHaveLength(1);
+    expect(items[0]!.url).toBe('https://www.lemonde.fr/ia');
+    expect(items[0]!.source_name).toBe('Le Monde');
+    expect(items[0]!.published_at).toBe('2026-10-08T13:00:00.000Z');
+    expect(isBingNewsUrl(apiclick)).toBe(true);
   });
 });
