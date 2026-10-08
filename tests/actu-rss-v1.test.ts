@@ -446,6 +446,26 @@ describe('actu-rss-v1', () => {
     );
   });
 
+  it('recherche=bing : zone « tout » (recherche nationale) et date_approx, flux A gardent leur zone', async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('bing.com/news')) {
+        return okText(url, rss([bingItem('Greve a Bordeaux', 'https://www.sudouest.fr/greve', 'Sud Ouest')]));
+      }
+      if (url.includes('dna.fr')) {
+        return okText(url, rss([{ title: 'Greve des trams', link: 'https://www.dna.fr/trams' }]));
+      }
+      return okText(url, rss([]));
+    });
+    const payload = await run({ zone: 'alsace', query: 'greve', recherche: 'bing', limit: 10 });
+    const bing = payload.items.find((i: { url: string }) => i.url === 'https://www.sudouest.fr/greve');
+    const dna = payload.items.find((i: { url: string }) => i.url === 'https://www.dna.fr/trams');
+    expect(bing.zone).toBe('tout');
+    expect(bing.date_approx).toBe(true);
+    expect(bing.age_hours).toBeGreaterThanOrEqual(0);
+    expect(dna.zone).toBe('alsace');
+    expect(dna.date_approx).toBeUndefined();
+  });
+
   it('recherche=bing since>24 → interval 8', async () => {
     mockFetch.mockImplementation(async (url: string) =>
       url.includes('bing.com')
