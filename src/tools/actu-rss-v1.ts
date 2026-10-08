@@ -1,0 +1,420 @@
+import * as z from 'zod/v4';
+import type { IrisTool } from './_types.js';
+import { fetchText } from '../utils/http-fetch.js';
+import { jsonResult, errorResult } from '../utils/git-run.js';
+import {
+  parseFeedXml,
+  normalizeTitle,
+  truncateSummary,
+  isGoogleNewsUrl,
+  domainOf,
+  dedupeKey,
+  type ParsedFeedItem,
+} from '../utils/rss-parse.js';
+
+type Zone = 'france' | 'alsace' | 'ia' | 'monde' | 'tout';
+
+interface FeedDef {
+  id: string;
+  name: string;
+  url: string;
+  zones: Zone[];
+  kind: 'publisher' | 'discovery';
+}
+
+/** Liste fixe (ADR-0006). Aucune URL client. Pas de ville personnelle. */
+const FEEDS: FeedDef[] = [
+  {
+    id: 'franceinfo',
+    name: 'franceinfo',
+    url: 'https://www.franceinfo.fr/titres.rss',
+    zones: ['france', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'lemonde-une',
+    name: 'Le Monde',
+    url: 'https://www.lemonde.fr/rss/une.xml',
+    zones: ['france', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'france3-grand-est',
+    name: 'France 3 Grand Est',
+    url: 'https://france3-regions.franceinfo.fr/grand-est/rss',
+    zones: ['alsace', 'france', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'dna',
+    name: 'DNA',
+    url: 'https://www.dna.fr/rss',
+    zones: ['alsace', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'lalsace',
+    name: "L'Alsace",
+    url: 'https://www.lalsace.fr/rss',
+    zones: ['alsace', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'actuia',
+    name: 'ActuIA',
+    url: 'https://www.actuia.com/feed/',
+    zones: ['ia', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'lemonde-pixels',
+    name: 'Le Monde Pixels',
+    url: 'https://www.lemonde.fr/pixels/rss_full.xml',
+    zones: ['ia', 'monde', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'siecle-digital',
+    name: 'Siècle Digital',
+    url: 'https://siecledigital.fr/feed/',
+    zones: ['ia', 'tout'],
+    kind: 'publisher',
+  },
+];
+
+const NOTE =
+  'Titres et liens seulement. Usage personnel. Lire l’article (fetch-url-v1) avant d’affirmer un fait. decouverte[] = Google Actualités : recherche nationale (la zone ne s’applique pas), liens non citables comme source éditeur. Zone ia = flux IA/tech numériques (ActuIA, Pixels, Siècle Digital) ; affiner avec query si besoin.';
+
+/**
+ * Chaque mot de la requete doit commencer un mot du titre ou du resume
+ * ("lycee" trouve "lycees"). Mot de 3 lettres ou moins : mot entier exige,
+ * sinon "IA" trouverait "social" ou "medias".
+ */
+function matchesQuery(item: ParsedFeedItem, query: string): boolean {
+  const words = normalizeTitle(query).split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  const hay = ` ${normalizeTitle(`${item.title} ${item.summary}`)} `;
+  return words.every((w) =>
+    w.length <= 3 ? hay.includes(` ${w} `) : hay.includes(` ${w}`),
+  );
+}
+
+/** Date ecrite dans l'URL (/AAAA/MM/JJ/), utile pour reperer une republication. */
+function dateFromUrl(url: string): string | null {
+  const m = /\/(20\d{2})\/(\d{2})\/(\d{2})\//.exec(url);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+/** pubDate plus recente que la date de l'URL de plus de 36 h = article ancien republie. */
+const REPUBLICATION_MS = 36 * 3_600_000;
+
+/**
+ * Garde l'ordre des dates mais plafonne chaque source a sa part de `limit`,
+ * pour qu'un flux tres bavard (franceinfo) ne cache pas les autres.
+ * Les places restantes sont ensuite remplies dans l'ordre des dates.
+ */
+function balanceSources<T extends { source: string }>(list: T[], limit: number): T[] {
+  const nSources = new Set(list.map((x) => x.source)).size;
+  if (nSources <= 1) return list.slice(0, limit);
+  const cap = Math.ceil(limit / nSources);
+  const perSource = new Map<string, number>();
+  const picked = new Set<T>();
+  for (const x of list) {
+    if (picked.size >= limit) break;
+    const n = perSource.get(x.source) ?? 0;
+    if (n >= cap) continue;
+    perSource.set(x.source, n + 1);
+    picked.add(x);
+  }
+  for (const x of list) {
+    if (picked.size >= limit) break;
+    picked.add(x);
+  }
+  return list.filter((x) => picked.has(x));
+}
+
+function ageHours(iso: string | null, now: Date): number | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return (now.getTime() - t) / 3_600_000;
+}
+
+function googleNewsUrl(query: string): string {
+  const q = encodeURIComponent(`${query} when:2d`);
+  return `https://news.google.com/rss/search?q=${q}&hl=fr&gl=FR&ceid=FR:fr`;
+}
+
+export const tool: IrisTool = {
+  id: 'actu-rss-v1',
+  description:
+    'Actualité via flux RSS fixes (France / Alsace / IA). Titres, dates, liens éditeur https. Pas de LLM. ADR-0006. Zone ia : ActuIA + Le Monde Pixels + Siècle Digital.',
+  category: 'web',
+  inputSchema: {
+    query: z
+      .string()
+      .min(1)
+      .max(120)
+      .optional()
+      .describe('Mots-clés optionnels (filtre titres / résumés)'),
+    zone: z
+      .enum(['france', 'alsace', 'ia', 'monde', 'tout'])
+      .optional()
+      .default('tout')
+      .describe('Choix des flux'),
+    since_hours: z
+      .number()
+      .int()
+      .min(1)
+      .max(168)
+      .optional()
+      .default(48)
+      .describe('Fenêtre de fraîcheur en heures'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(30)
+      .optional()
+      .default(10)
+      .describe('Nombre d articles rendus'),
+    google_news: z
+      .boolean()
+      .optional()
+      .default(false)
+      .describe('Ajoute Google Actualités (découverte seulement)'),
+  },
+  execute: async (input) => {
+    const query = (input.query as string | undefined)?.trim() || '';
+    const zone = ((input.zone as Zone | undefined) ?? 'tout') as Zone;
+    const sinceHours = (input.since_hours as number | undefined) ?? 48;
+    const limit = (input.limit as number | undefined) ?? 10;
+    const googleNews = (input.google_news as boolean | undefined) ?? false;
+
+    const now = new Date();
+    const todayFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Paris',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const today = todayFmt.format(now);
+    const nowParis = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Paris',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .format(now)
+      .replace(' ', 'T');
+
+    const selected = FEEDS.filter((f) => f.zones.includes(zone));
+    const jobs: { def: FeedDef; url: string }[] = selected.map((def) => ({
+      def,
+      url: def.url,
+    }));
+    if (googleNews && query) {
+      jobs.push({
+        def: {
+          id: 'google-news',
+          name: 'Google Actualités',
+          url: googleNewsUrl(query),
+          zones: ['tout'],
+          kind: 'discovery',
+        },
+        url: googleNewsUrl(query),
+      });
+    }
+
+    if (jobs.length === 0) {
+      return errorResult(`Aucun flux pour zone=${zone}`);
+    }
+
+    type FeedState = {
+      id: string;
+      name: string;
+      url: string;
+      status: 'ok' | 'vide' | 'erreur';
+      message?: string;
+      count?: number;
+    };
+
+    const feeds: FeedState[] = [];
+    if (googleNews && !query) {
+      feeds.push({
+        id: 'google-news',
+        name: 'Google Actualités',
+        url: '',
+        status: 'erreur',
+        message: 'non appelé : google_news demande une query',
+      });
+    }
+    const collected: {
+      title: string;
+      source: string;
+      url: string;
+      published_at: string | null;
+      age_hours: number | null;
+      summary: string;
+      zone: Zone;
+      discovery: boolean;
+      date_inconnue: boolean;
+      date_douteuse?: true;
+      date_url?: string;
+      domain: string;
+      normTitle: string;
+    }[] = [];
+
+    const results = await Promise.allSettled(
+      jobs.map(async ({ def, url }) => {
+        const res = await fetchText(url, { maxChars: 200_000 });
+        return { def, url, text: res.text, status: res.status };
+      }),
+    );
+
+    let anyOk = false;
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]!;
+      const job = jobs[i]!;
+      if (r.status === 'rejected') {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        feeds.push({
+          id: job.def.id,
+          name: job.def.name,
+          url: job.url,
+          status: 'erreur',
+          message: msg,
+        });
+        continue;
+      }
+      const { def, url, text } = r.value;
+      try {
+        const items = parseFeedXml(text);
+        if (items.length === 0) {
+          feeds.push({
+            id: def.id,
+            name: def.name,
+            url,
+            status: 'vide',
+            count: 0,
+          });
+          continue;
+        }
+        anyOk = true;
+        feeds.push({
+          id: def.id,
+          name: def.name,
+          url,
+          status: 'ok',
+          count: items.length,
+        });
+        const primaryZone =
+          (def.zones.find((z) => z !== 'tout') as Zone | undefined) ?? zone;
+        for (const it of items) {
+          if (!it.url || !/^https:\/\//i.test(it.url)) continue;
+          const discovery =
+            def.kind === 'discovery' || isGoogleNewsUrl(it.url);
+          const age = ageHours(it.published_at, now);
+          const date_inconnue = !it.published_at;
+          if (!date_inconnue && age !== null && age > sinceHours) continue;
+          if (query && !matchesQuery(it, query)) continue;
+          const dateUrl = dateFromUrl(it.url);
+          const republie =
+            dateUrl !== null &&
+            it.published_at !== null &&
+            Date.parse(it.published_at) - Date.parse(dateUrl) > REPUBLICATION_MS;
+          collected.push({
+            title: it.title,
+            source: (discovery && it.source_name) || def.name,
+            url: it.url,
+            published_at: it.published_at,
+            age_hours: age === null ? null : Math.round(age * 10) / 10,
+            summary: truncateSummary(it.summary),
+            zone: primaryZone,
+            discovery,
+            date_inconnue,
+            ...(republie ? { date_douteuse: true as const, date_url: dateUrl! } : {}),
+            domain: domainOf(it.url),
+            normTitle: dedupeKey(it.title, it.url),
+          });
+        }
+      } catch (e) {
+        feeds.push({
+          id: def.id,
+          name: def.name,
+          url,
+          status: 'erreur',
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    if (!anyOk) {
+      return jsonResult({
+        error: 'Tous les flux ont échoué ou sont vides. Voir feeds[] pour le détail.',
+        feeds,
+      });
+    }
+
+    // Dédoublonnage : titre normalisé, ou URL si titre placeholder (B10)
+    const seen = new Set<string>();
+    const deduped: typeof collected = [];
+    for (const it of collected) {
+      const key = it.normTitle;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(it);
+    }
+
+    // Tri : datés d'abord (plus récents), puis date_inconnue
+    deduped.sort((a, b) => {
+      if (a.published_at && b.published_at) {
+        return Date.parse(b.published_at) - Date.parse(a.published_at);
+      }
+      if (a.published_at) return -1;
+      if (b.published_at) return 1;
+      return 0;
+    });
+
+    // Google Actualites a part : sinon ses 100 resultats chassent les liens editeurs citables
+    const toOutput = ({
+      normTitle: _n,
+      domain: _d,
+      discovery: _g,
+      ...rest
+    }: (typeof collected)[number]) => rest;
+    const items = balanceSources(
+      deduped.filter((x) => !x.discovery),
+      limit,
+    ).map(toOutput);
+    const decouverte = balanceSources(
+      deduped.filter((x) => x.discovery),
+      limit,
+    ).map(toOutput);
+
+    let recoupement: number | null = null;
+    if (query) {
+      const domains = new Set(
+        deduped.filter((x) => !x.discovery && x.domain).map((x) => x.domain),
+      );
+      recoupement = domains.size;
+    }
+
+    return jsonResult({
+      now: nowParis,
+      today,
+      query: query || null,
+      zone,
+      since_hours: sinceHours,
+      items,
+      decouverte,
+      recoupement,
+      feeds,
+      note: NOTE,
+    });
+  },
+};
