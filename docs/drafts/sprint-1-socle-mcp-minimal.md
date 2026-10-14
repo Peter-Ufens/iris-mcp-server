@@ -181,7 +181,7 @@ Et mentionne aussi ou trouver d'autres outils MCP externes :
 ```bash
 # === Sprint 1 : Ollama + Filesystem ===
 OLLAMA_BASE_URL=http://localhost:11434
-ALLOWED_ROOTS=D:/atelier-local,D:/produit-compagnon
+ALLOWED_ROOTS=C:/chemin/vers/studio,C:/chemin/vers/companion
 
 # === Sprint 2+ (pas utilise maintenant, mais prepare) ===
 # ANTHROPIC_API_KEY=sk-ant-...
@@ -200,10 +200,10 @@ ALLOWED_ROOTS=D:/atelier-local,D:/produit-compagnon
   "mcpServers": {
     "iris": {
       "command": "node",
-      "args": ["D:/atelier-local/iris-mcp-server/dist/index.js"],
+      "args": ["C:/chemin/vers/iris-mcp-server/dist/index.js"],
       "env": {
         "OLLAMA_BASE_URL": "http://localhost:11434",
-        "ALLOWED_ROOTS": "D:/atelier-local,D:/produit-compagnon"
+        "ALLOWED_ROOTS": "C:/chemin/vers/studio,C:/chemin/vers/companion"
       }
     }
   }

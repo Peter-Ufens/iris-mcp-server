@@ -117,23 +117,23 @@ Les motifs sont charges via la variable d'environnement `ZONE_A_PATTERNS_FILE`.
 Ouvrir la zone sensible reste un geste manuel de Peter via
 `query-rag.ps1 -IncludeZoneA -AllowStrictPrivate`.
 
-**Zone reservee (v0.9.0).** Un dossier de dossier-sensible ne releve ni de l'personnel ni des conversations
-brutes : il doit etre ferme par defaut mais ouvrable volontairement. Motifs : cle
+**Zone reservee (v0.9.0).** Une zone privee sensible (hors personnel et hors conversations
+brutes) : fermee par defaut, ouvrable volontairement. Motifs : cle
 `ragReservedContains` du meme fichier de zones.
 
-| Appel | Conversations brutes (A-1) | Reserved | Zone sensible (A-2) |
+| Appel | Conversations brutes (A-1) | Zone reservee | Zone sensible (A-2) |
 |---|---|---|---|
 | defaut | fermees | fermee | fermee |
 | `includeZoneA: true` | ouvertes | **fermee** | fermee |
 | `includeReserved: true` | fermees | ouverte | fermee |
 | les deux | ouvertes | ouverte | fermee |
 
-- Un chemin a la fois reserved et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
+- Un chemin a la fois reserve et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
 - La liste A-2 est ajoutee dans tous les cas, meme si le fichier ne l'a pas recopiee dans la liste A-1.
 - `meta.filterReserved` indique si la zone etait fermee pour l'appel.
 - Une recherche `includeReserved: true` n'est jamais journalisee.
-- A utiliser seulement quand l'utilisateur demande explicitement ce dossier.
-- Fichier de zones illisible : repli fail-closed habituel, aucun motif reserved connu, rien a ouvrir.
+- A utiliser seulement quand l'utilisateur demande explicitement cette zone.
+- Fichier de zones illisible : repli fail-closed habituel, aucun motif reserve connu, rien a ouvrir.
 
 Details ops : depot prive `iris-mcp-server-private` · hub RAG local.
 

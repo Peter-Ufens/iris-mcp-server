@@ -431,7 +431,7 @@ export const tool: IrisTool = {
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
     includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnel A-2 ni la zone reservee.'),
-    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (dossier de dossier-sensible), seulement si l'utilisateur demande explicitement ce dossier (defaut false). N ouvre jamais la zone personnel A-2."),
+    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnel A-2."),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
   execute: avecJournal('rag-hybrid-v1', async (input) => {

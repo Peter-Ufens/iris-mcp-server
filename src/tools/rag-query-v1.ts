@@ -12,7 +12,7 @@ import { avecJournal } from '../utils/rag-journal.js';
  *
  * Gouvernance Zone A : la regle, et elle n'est pas negociable cote MCP :
  *   - par defaut          : Zone A filtree (conversations brutes + personnel exclus) et zone reservee fermee
- *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT (pas le reserved)
+ *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT (pas la zone reservee)
  *   - includeReserved  : ouvre la zone reservee (ragReservedContains) UNIQUEMENT
  *   - Zone A-2 "personnel"   : JAMAIS ouverte par cet outil, quel que soit l'input.
  *     L'ouverture de l'personnel reste un geste manuel et explicite de Peter :
@@ -417,7 +417,7 @@ export const tool: IrisTool = {
       .boolean()
       .optional()
       .describe(
-        "Ouvre la zone reservee (dossier de dossier-sensible), seulement si l'utilisateur demande explicitement ce dossier (defaut false). N ouvre jamais la zone personnel A-2.",
+        "Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnel A-2.",
       ),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon

@@ -29,8 +29,8 @@ MCP doit connaitre ces agents pour le routage :
 
 | Nom agent | Role | Modele par defaut | Emplacement |
 |-----------|------|-------------------|-------------|
-| **Lyla** | Interface conversationnelle (voix, personnalite) | Ollama local (qwen3:32b) | `D:\produit-compagnon\` |
-| **Iris** | Atelier technique, constructrice de Lyla | Cursor + MCP | `D:\atelier-local\` |
+| **Lyla** | Interface conversationnelle (voix, personnalite) | Ollama local (qwen3:32b) | `C:\\chemin\\vers\\companion\` |
+| **Iris** | Atelier technique, constructrice de Lyla | Cursor + MCP | `C:\\chemin\\vers\\studio\` |
 | **Sharon** | Architecte, scribe, planificatrice | Claude Opus / Sonnet (cloud) | Claude Desktop |
 | **Karen** | Hub n8n, scripts, automatisation | Ollama local | `C:\...\Ollama local\` |
 | **Nora** | Modeles locaux Ollama | Ollama multi-modeles | localhost:11434 |
@@ -523,7 +523,7 @@ POSTGRES_URL=postgresql://user:pass@localhost:5432/iris_memory
 QDRANT_URL=http://localhost:6333
 
 # === Securite ===
-ALLOWED_ROOTS=D:/atelier-local,D:/produit-compagnon
+ALLOWED_ROOTS=C:/chemin/vers/studio,C:/chemin/vers/companion
 
 # === Serveur HTTP/SSE (optionnel, pour Cloudflare Tunnel futur) ===
 HTTP_PORT=3100
