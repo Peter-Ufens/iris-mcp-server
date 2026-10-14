@@ -115,8 +115,8 @@ Detail : hub `planning/backlog-cli-iris-2026-09-02.md`.
 
 - **n8n / Nora** : orchestration (appelle Iris)
 - **Ollama / Lana** : LLM local
-- **Companion-OS** : produit compagne
-- **Hub Iris-MCP** (`<workspace>\Iris-MCP`) : planning, ADR, configs
+- **Produit compagnon** (memoire / voix) : hors de ce depot
+- **Hub docs local** (planning, ADR) : hors de ce depot public
 
 ## References
 

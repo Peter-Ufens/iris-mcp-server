@@ -1,6 +1,6 @@
 # MCP open source — comprendre, local, et brancher Cursor + Claude
 
-> **MAJ etat live (2026-08-07) :** v0.5.0 · **24 outils** · canon `<workspace>\Iris-MCP\iris-mcp-server` · repo GitHub **public**.  
+> **MAJ etat live (2026-08-07) :** v0.5.0 · **24 outils** · canon = ce depot · repo GitHub **public**.  
 > Config Cursor : [cursor-config.md](cursor-config.md) (pas `mcp-cursor-config.md`).
 
 **Pour Peter** — 2026-04-12, relecture juillet 2026.

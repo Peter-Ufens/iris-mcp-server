@@ -13,13 +13,13 @@ Le 2026-05-03, deux scaffolds existaient pour le serveur MCP de Peter :
 
 1. **`Peter-Ufens/mcp-server`** (Python + uv) : scaffold cree au Lot F le matin du 2026-05-03, basee sur la decision du cours Udemy MCP de Nikolai Schuller (Python + uv). Pas de code fonctionnel.
 
-2. **`D:\Parent-Studio\iris-mcp-server\`** (TypeScript + npm) : code fonctionnel cree par Sharon-001 le 2026-04-12, avec outils operationnels (`iris-ping-v1`, `ollama-list-v1`, `ollama-chat-v1`, `fs-read-v1`, `fs-list-v1`), tests Vitest, configs Cursor + Claude Desktop documentees. Base sur ADR-0002 (hub n8n -> serveur MCP custom).
+2. **Atelier local TypeScript + npm** : code fonctionnel cree par Sharon-001 le 2026-04-12, avec outils operationnels (`iris-ping-v1`, `ollama-list-v1`, `ollama-chat-v1`, `fs-read-v1`, `fs-list-v1`), tests Vitest, configs Cursor + Claude Desktop documentees. Base sur ADR-0002 (hub n8n -> serveur MCP custom).
 
 Sharon (Claude Code) a fait l'analyse comparative et recommande TypeScript. Peter a valide.
 
 ## Decision
 
-Adopter le code TypeScript existant de `Parent-Studio/iris-mcp-server/` comme base pour le repo prive `Peter-Ufens/iris-mcp-server`. Abandonner le scaffold Python (archive en local : `D:\Audit-Archive\repos\mcp-server-python-bak\`).
+Adopter le code TypeScript existant de l'atelier local comme base pour le depot `Peter-Ufens/iris-mcp-server`. Abandonner le scaffold Python (archive locale hors de ce depot).
 
 Stack figee :
 

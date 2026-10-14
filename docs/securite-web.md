@@ -1,7 +1,7 @@
 # Securite des outils web (categorie `web`)
 
-> Decision de reference : **ADR-0005 "Outils web : securite (SSRF, plafonds)"**, hub local
-> `<workspace>\Iris-MCP\ADR\ADR-0005-outils-web-securite.md` (hub = loi, cf. ADR-0004).
+> Decision de reference : **ADR-0005 "Outils web : securite (SSRF, plafonds)"**
+> (canon dans le hub docs local du projet, hors de ce depot public ; cf. ADR-0004).
 > Cette page ne resume que ce que le code applique, pour un lecteur du repo public.
 
 Depuis la v0.5.0, `fetch-url-v1` accepte une **URL fournie par le client** (donc

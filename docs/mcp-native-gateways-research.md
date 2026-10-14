@@ -74,7 +74,7 @@ Ce n’est **pas** un dossier `LiteLLM\` à la racine de `IA` : la config, les s
 
 ---
 
-## Recommandation Iris pour **Parent-Studio** (sans jeter le travail déjà fait)
+## Recommandation Iris pour **atelier-local** (sans jeter le travail déjà fait)
 
 1. **Composition, pas remplacement brutal** : tu peux avoir **deux entrées** `mcpServers` — par ex. **`iris`** (outils maison : ping, tags Ollama, futurs `lyla-health`, fs-safe, …) et **`pal`** ou **`ollama-mcp`** (routing / outils Ollama complets). Cursor agrège les outils des **deux** processus.
 2. **Fork de pal** : possible plus tard si tu veux une **seule** base ; coût = suivre les mises à jour upstream, licence, sécurité des clés. **Pas obligatoire** tant que `npx pal-mcp-server@latest` + `iris` local suffisent.

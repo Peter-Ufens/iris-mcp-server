@@ -1,13 +1,13 @@
 # OBSOLETE — utiliser `cursor-config.md`
 
-> **Ce fichier est depasse** (chemins Hybrid, outil `ollama-tags-v1` inexistant).  
-> **Canon :** [cursor-config.md](cursor-config.md) · chemin live : `<workspace>\Iris-MCP\iris-mcp-server\dist\index.js`  
+> **Ce fichier est depasse** (anciens exemples de chemins).  
+> **Canon :** [cursor-config.md](cursor-config.md)  
 > **Date archivage doc :** 2026-07-27 (audit V2)
 
 ---
 
 <details>
-<summary>Ancien contenu (reference historique Hybrid avril 2026)</summary>
+<summary>Ancien contenu (reference historique)</summary>
 
 Voir historique git si besoin. Ne pas suivre les instructions ci-dessous.
 

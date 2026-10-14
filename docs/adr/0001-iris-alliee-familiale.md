@@ -9,25 +9,24 @@
 
 ## Contexte
 
-Le plan v9 (section 1) définit Iris comme « l'alliée familiale de Companion-OS »,
-c'est-à-dire un atelier technique dédié à la construction, la maintenance et
-l'évolution de Lyla. Ce positionnement provient du plan v8 (ADR-0023) et a été
+Le plan v9 (section 1) définit Iris comme « l'alliée familiale » d'un produit
+compagnon (voix / mémoire), c'est-à-dire un atelier technique dédié à sa
+construction, sa maintenance et son évolution. Ce positionnement a été
 confirmé explicitement par Peter lors de la session du 11/04/2026.
 
 Iris n'est **pas** une application autonome tournée vers l'utilisateur final.
 Elle n'a pas d'interface propre destinée à Peter au quotidien. Son seul
-« client » est Companion-OS.
+« client » est ce produit compagnon.
 
 ## Décision
 
 Nous adoptons la posture « alliée familiale » pour Iris :
 
-1. **Iris construit Lyla** — jamais l'inverse.
-2. **Iris ne parle pas à l'utilisateur** — seule Lyla a une voix et une
+1. **Iris construit le compagnon** — jamais l'inverse.
+2. **Iris ne parle pas à l'utilisateur** — seul le compagnon a une voix et une
    personnalité face à Peter.
-3. **Iris opère en chirurgienne** — toute intervention sur `D:\Companion-OS\` passe
-   par un dépôt temporaire `D:\Companion-OS-surgery-YYYYMMDD-<ticket>\`, jamais
-   d'écriture directe sur le dépôt principal.
+3. **Iris opère en chirurgienne** — toute intervention sur le dépôt compagnon passe
+   par un dépôt temporaire de travail, jamais d'écriture directe sur le dépôt principal.
 4. **Iris est modulaire** — un serveur MCP central avec des outils à identifiant
    unique, évolutif sans gel dans le temps.
 5. **Iris respecte les territoires** — elle ne touche pas aux domaines de Karen,
@@ -44,8 +43,8 @@ Nous adoptons la posture « alliée familiale » pour Iris :
 ## Conséquences
 
 ### Positives
-- Séparation claire des responsabilités : Iris = fabrique, Lyla = produit.
-- Pattern chirurgienne = zéro risque de casse sur Companion-OS main.
+- Séparation claire des responsabilités : Iris = fabrique, compagnon = produit.
+- Pattern chirurgienne = zéro risque de casse sur la branche principale du compagnon.
 - Modularité MCP = ajout/retrait d'outils sans refonte.
 - Cohérence avec l'écosystème d'agents féminins (Sharon, Karen, Nora, etc.).
 
