@@ -32,7 +32,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 | Journal des recherches RAG (opt-in `IRIS_RAG_JOURNAL_DIR`) | OK, desactive par defaut · [docs/rag-journal.md](docs/rag-journal.md) |
 | Zone reservee (`ragReservedContains`, opt-in `includeReserved`) | OK, fermee par defaut et avec `includeZoneA` · [docs/tool-catalog.md](docs/tool-catalog.md) |
 | Deploiement distant / HTTP public | Pas encore (roadmap v1.0.0) |
-| Memoire partagee, sante Lyla, n8n | Planifies, pas livres |
+| Memoire partagee, supervision systeme, n8n | Planifies, pas livres |
 
 **Ce que ca demontre :** capacite a concevoir un outil technique documente, teste, versionne, utile dans un ecosysteme IA personnel (vault Obsidian + agents + LLM local). Projet en **pause fonctionnelle** : le socle est la, la suite viendra avec Lyla / Agent-Communication.
 

@@ -808,15 +808,15 @@ export const tool: IrisTool = {
     'Recherche dans le vault de Peter en comprenant son vocabulaire (glossaire prive, dictee comprise) : ' +
     'plusieurs formulations de la question sont cherchees puis fusionnees. Si aucun extrait ne porte les termes ' +
     "de la question, needsClarification=true et un message propose de preciser le contexte : ne pas inventer de reponse. " +
-    'Memes regles de Zone A que rag-query-v1 (zone personnel jamais ouverte). Pour un mot-cle exact et rapide, preferer rag-query-v1.',
+    'Memes regles de Zone A que rag-query-v1 (zone personnelle stricte jamais ouverte). Pour un mot-cle exact et rapide, preferer rag-query-v1.',
   category: 'memory',
   inputSchema: {
     query: z.string().min(1).describe('Question en langage naturel, telle que dictee'),
     limit: z.number().int().min(1).max(25).optional().describe('Nombre de passages (defaut 5, max 25)'),
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
-    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnel A-2 ni la zone reservee.'),
-    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnel A-2."),
+    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.'),
+    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2."),
     reformulate: z.boolean().optional().describe('Reformulations par le modele local (defaut true). false = plus rapide.'),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
