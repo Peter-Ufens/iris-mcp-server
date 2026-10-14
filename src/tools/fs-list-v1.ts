@@ -13,8 +13,9 @@ export const tool: IrisTool = {
     path: z.string().describe('Chemin absolu du repertoire a lister'),
     pattern: z
       .string()
+      .max(80)
       .optional()
-      .describe('Pattern glob simple pour filtrer (ex: *.ts)'),
+      .describe('Pattern glob simple pour filtrer (ex: *.ts) · max 80 car. · max 10 *'),
   },
   execute: async (input) => {
     const inputPath = input.path as string;
@@ -42,6 +43,21 @@ export const tool: IrisTool = {
       );
 
       if (pattern) {
+        // F3 red team 14/10 : ReDoS via trop de `*` (ex. *a*a…*b).
+        const starCount = (pattern.match(/\*/g) ?? []).length;
+        if (starCount > 10 || pattern.length > 80) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify({
+                  error:
+                    'Pattern trop complexe (max 80 caracteres, max 10 *). Simplifiez le filtre.',
+                }),
+              },
+            ],
+          };
+        }
         const escaped = pattern
           .replace(/[.+^${}()|[\]\\]/g, '\\$&')
           .replace(/\*/g, '.*')

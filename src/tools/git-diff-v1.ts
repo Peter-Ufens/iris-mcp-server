@@ -20,7 +20,7 @@ function truncateDiff(diff: string): { diff: string; truncated: boolean } {
 export const tool: IrisTool = {
   id: 'git-diff-v1',
   description:
-    "Retourne la diff Git d un repo local. Mode staged, unstaged ou head (tout vs HEAD).",
+    'Retourne la diff Git d un repo local. Mode staged, unstaged ou head (tout vs HEAD). Depots de confiance seulement (diff externe desactivee).',
   category: 'git',
   inputSchema: {
     repo_path: z.string().describe('Chemin absolu vers le repo Git local'),

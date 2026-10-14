@@ -6,7 +6,7 @@ import { runGit, GitCommandError, jsonResult, errorResult } from '../utils/git-r
 export const tool: IrisTool = {
   id: 'git-commit-v1',
   description:
-    'Cree un commit Git dans un repo local avec le message fourni. Commit uniquement les fichiers deja stages (pas de git add implicite).',
+    'Cree un commit Git dans un repo local avec le message fourni. Commit uniquement les fichiers deja stages (pas de git add implicite). Depots de confiance seulement (hooks / helpers externes neutralises).',
   category: 'git',
   inputSchema: {
     repo_path: z.string().describe('Chemin absolu vers le repo Git local'),
