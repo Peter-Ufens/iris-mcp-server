@@ -193,7 +193,7 @@ const FEEDS: FeedDef[] = [
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel / non commercial. Titre ≠ fait : lire l’article (fetch-url-v1 ou navigateur) avant d’affirmer. Date de publication ≠ date de l’événement si la page le dit. Si date_approx (Bing) : ne pas citer une heure sans la page éditeur. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] ; Google → decouverte[]) : recherche nationale (zone sortie « tout »). Voie C = zone `officiel` (service-public.gouv.fr : droits/aides/démarches, pas faits divers). Zone alsace = DNA / L’Alsace + France 3 limité Bas-Rhin·Haut-Rhin·alsace. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel / non commercial. Titre ≠ fait : lire l’article (fetch-url-v1 ou navigateur) avant d’affirmer. Date de publication ≠ date de l’événement si la page le dit. Si date_approx (Bing) : ne pas citer une heure sans la page éditeur. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] ; Google → decouverte[]) : recherche nationale (zone sortie « tout »). Voie C = zone `officiel` (service-public.gouv.fr : droits/aides/démarches, pas faits divers ; date = jour civil, pas d’heure fiable, ne pas lire age_hours comme une heure exacte). Zone alsace = DNA / L’Alsace + France 3 limité Bas-Rhin·Haut-Rhin·alsace. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume

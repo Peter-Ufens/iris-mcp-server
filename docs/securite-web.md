@@ -11,8 +11,10 @@ construisent leurs URL eux-memes. La garde est dans `src/utils/url-guard.ts` et
 
 Depuis la v0.10.0, `actu-rss-v1` lit des **flux RSS fixes** (liste dans le code) et,
 si demande, des URL Google / Bing Actualites construites serveur-side. **Aucune URL client.**
-Regles ADR-0006 / ADR-0008 (hub Iris-MCP) : titres / liens / resume court, usage personnel,
+Regles ADR-0006 / ADR-0008 / ADR-0010 (hub Iris-MCP) : titres / liens / resume court, usage personnel,
 pas de texte integral d'article. Bing : lien editeur decode depuis `apiclick` (https).
+Depuis la v0.11.3 : zone `officiel` = flux `service-public.gouv.fr` (particuliers + pro), meme garde
+https / liste fixe / pas d'URL client.
 
 ## Ce qui est refuse
 
