@@ -21,7 +21,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 
 | Element | Etat |
 |---|---|
-| 29 outils MCP operationnels | OK, testes (Vitest 345/345) |
+| 29 outils MCP operationnels | OK, testes (Vitest 350/350) |
 | Integration Cursor + Claude Desktop | OK (stdio local) |
 | Ollama local (liste modeles + chat) | OK |
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
@@ -121,7 +121,7 @@ iris-mcp-server/
 │       ├── http-fetch.ts     # Client JSON + fetch texte plafonne
 │       ├── html-text.ts      # HTML vers texte
 │       └── rss-parse.ts      # Lecteur RSS/Atom maison (actu-rss-v1)
-├── tests/                    # Vitest (345 tests)
+├── tests/                    # Vitest (350 tests)
 ├── docs/
 ├── dist/                     # Build TypeScript
 └── package.json
