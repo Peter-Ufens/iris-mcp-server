@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-10-14) :** **v0.11.3** · **29 outils** · **350 tests** · repo **public** GitHub · voie C officiel · harden sécu F1–F5.  
-> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** (Bing + filtre Alsace).
+> **Etat live (2026-10-14) :** **v0.12.0** · **29 outils** · **350 tests** · repo **public** GitHub · voie C officiel · harden secu F1–F5 · API zone reservee (`includeReserved`).  
+> Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **cloture** (Bing + Alsace + officiel).
 
 ---
 
-## Etat present : v0.11.3 (octobre 2026)
+## Etat present : v0.12.0 (octobre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
@@ -23,6 +23,8 @@
 | v0.11.0 | Bing Actualites = voie B (`recherche=bing|les_deux`) · decode apiclick · heure Pacific | ✅ |
 | v0.11.1 | Review Bob Bing : garde-fous heure · decode unique · zone recherche `tout` · `date_approx` | ✅ |
 | v0.11.2 | Filtre Alsace France 3 (Bas-Rhin/Haut-Rhin) · note titre≠fait | ✅ |
+| v0.11.3 | Voie C `zone=officiel` (service-public) · ADR-0010 | ✅ |
+| v0.12.0 | Rename API zone reservee (`includeReserved` / `ragReservedContains`) · vitrine hist propre | ✅ |
 
 Liste complete : [tool-catalog.md](tool-catalog.md).
 
@@ -39,7 +41,7 @@ Les sections ci-dessous decrivent la **vision** Sharon (mai 2026), **renumerotee
 parce que les paliers **v0.6.0 a v0.9.0** ont ete pris par le lot web puis le RAG vault.
 Dates indicatives, reversibles.
 
-### v0.4.5 — APIs etendues
+### v0.4.5  ·  APIs etendues
 
 Largement **deja livre** en v0.4.2 (geocoding, sunrise, news, translate, random-fact, nasa-apod).
 
@@ -49,29 +51,29 @@ Largement **deja livre** en v0.4.2 (geocoding, sunrise, news, translate, random-
 Non livre sous ces noms : le numero 0.5.0 a ete pris par le lot web ;
 le RAG vault livre en v0.6–0.9 est une autre voie (Qdrant + outils `rag-*`).
 
-### ~~v0.6.0 — Recherche web gratuite~~ : **livre en v0.5.0**
+### ~~v0.6.0  ·  Recherche web gratuite~~ : **livre en v0.5.0**
 
 `web-search-ddg-v1`, `wikipedia-search-v1`, `fetch-url-v1` : livres le 2026-08-07.
 Reste ouvert sur ce theme (non engage) : recherche web indexee avec cle (Brave Search
 API, `BRAVE_API_KEY` commente dans `.env.example`), l'Instant Answer de DuckDuckGo ne
 couvrant pas tout le web.
 
-### v0.10.0 — Surveillance ecosysteme (ex vision « v0.7.0 »)
+### v0.10.0  ·  Surveillance ecosysteme (ex vision « v0.7.0 »)
 
 `lyla-health-v1`, `ollama-status-v1`, `system-stats-v1`.
 (Numero 0.7.0 deja pris par `rag-hybrid-v1`.)
 
-### v0.11.0 — Routing intelligent (ex vision « v0.8.0 »)
+### v0.11.0  ·  Routing intelligent (ex vision « v0.8.0 »)
 
 `route-v1` (choix LLM local vs cloud).
 (Numero 0.8.0 deja pris par `rag-journal-link-v1`.)
 
-### v0.12.0 — Registres dynamiques (ex vision « v0.9.0 »)
+### Vision registres dynamiques (ex plan « v0.12.0 », a renumeroter)
 
 `agent-list/add/update`, `model-list/add/remove/test`.
-(Numero 0.9.0 deja pris par zone reservee.)
+(Numero 0.9.0 deja pris par zone reservee ; **0.12.0 live** = rename API reservee, pas ces registres.)
 
-### v1.0.0 — Transport HTTP/SSE + exposition distante
+### v1.0.0  ·  Transport HTTP/SSE + exposition distante
 
 - Transport HTTP/SSE en parallele de stdio
 - Integration Cloudflare tunnel
@@ -120,8 +122,8 @@ Detail : hub `planning/backlog-cli-iris-2026-09-02.md`.
 
 ## References
 
-- [docs/adr/](adr/) — heritage Hybrid (lire bandeau contexte)
-- [docs/identity/](identity/) — manifeste / persona Iris
+- [docs/adr/](adr/)  ·  heritage Hybrid (lire bandeau contexte)
+- [docs/identity/](identity/)  ·  manifeste / persona Iris
 - Specification MCP : https://modelcontextprotocol.io/
 
 ---
