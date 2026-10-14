@@ -3,6 +3,11 @@ import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { IrisTool } from './_types.js';
 import { validatePath, PathGuardError } from '../utils/path-guard.js';
+import { matchSimpleGlob } from '../utils/simple-glob.js';
+
+/** R1 Bob 14/10 : 10 * gelait encore ; seuil sûr = 4 (+ glob sans regex). */
+const MAX_GLOB_STARS = 4;
+const MAX_GLOB_LEN = 80;
 
 export const tool: IrisTool = {
   id: 'fs-list-v1',
@@ -13,9 +18,11 @@ export const tool: IrisTool = {
     path: z.string().describe('Chemin absolu du repertoire a lister'),
     pattern: z
       .string()
-      .max(80)
+      .max(MAX_GLOB_LEN)
       .optional()
-      .describe('Pattern glob simple pour filtrer (ex: *.ts) · max 80 car. · max 10 *'),
+      .describe(
+        `Pattern glob simple pour filtrer (ex: *.ts) · max ${MAX_GLOB_LEN} car. · max ${MAX_GLOB_STARS} *`,
+      ),
   },
   execute: async (input) => {
     const inputPath = input.path as string;
@@ -43,27 +50,21 @@ export const tool: IrisTool = {
       );
 
       if (pattern) {
-        // F3 red team 14/10 : ReDoS via trop de `*` (ex. *a*a…*b).
+        // R1 : borne stricte + matchSimpleGlob (pas de ReDoS regex).
         const starCount = (pattern.match(/\*/g) ?? []).length;
-        if (starCount > 10 || pattern.length > 80) {
+        if (starCount > MAX_GLOB_STARS || pattern.length > MAX_GLOB_LEN) {
           return {
             content: [
               {
                 type: 'text' as const,
                 text: JSON.stringify({
-                  error:
-                    'Pattern trop complexe (max 80 caracteres, max 10 *). Simplifiez le filtre.',
+                  error: `Pattern trop complexe (max ${MAX_GLOB_LEN} caracteres, max ${MAX_GLOB_STARS} *). Simplifiez le filtre.`,
                 }),
               },
             ],
           };
         }
-        const escaped = pattern
-          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-          .replace(/\*/g, '.*')
-          .replace(/\?/g, '.');
-        const regex = new RegExp(`^${escaped}$`);
-        entries = entries.filter((e) => regex.test(e.name));
+        entries = entries.filter((e) => matchSimpleGlob(e.name, pattern));
       }
 
       return {
