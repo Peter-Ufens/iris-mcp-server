@@ -56,15 +56,23 @@ export function isHtmlContentType(contentType: string): boolean {
  * remplace les balises de bloc par des sauts de ligne, decode les entites,
  * normalise les espaces.
  */
+/** Plafond entree HTML (F2 red team 14/10 : O(n2) sur beaucoup de `<`). */
+const HTML_TO_TEXT_MAX_INPUT = 100_000;
+
 export function htmlToText(html: string): string {
+  const clipped =
+    html.length > HTML_TO_TEXT_MAX_INPUT
+      ? html.slice(0, HTML_TO_TEXT_MAX_INPUT)
+      : html;
   return decodeEntities(
-    html
+    clipped
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/<(script|style|noscript|template|svg|iframe)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
       .replace(/<(script|style|noscript|template|svg|iframe)\b[^>]*>/gi, ' ')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|li|tr|h[1-6]|section|article|header|footer|nav|blockquote|pre|table)\s*>/gi, '\n')
-      .replace(/<[^>]*>/g, ' ')
+      // Borne la longueur d'attributs dans une balise (evite ReDoS / O(n2)).
+      .replace(/<[^>]{0,2000}>/g, ' ')
       // Corps tronque : une balise ouverte non fermee peut trainer en fin de texte.
       .replace(/<[^>]*$/, ' '),
   )

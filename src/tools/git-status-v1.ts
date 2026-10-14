@@ -44,7 +44,7 @@ function parsePorcelainV2(raw: string): ParsedStatus {
 export const tool: IrisTool = {
   id: 'git-status-v1',
   description:
-    'Retourne le statut Git d un repo local (staged, unstaged, untracked, branche courante).',
+    'Retourne le statut Git d un repo local (staged, unstaged, untracked, branche courante). Depots de confiance seulement (helpers externes neutralises).',
   category: 'git',
   inputSchema: {
     repo_path: z.string().describe('Chemin absolu vers le repo Git local'),

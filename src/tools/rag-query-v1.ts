@@ -32,7 +32,29 @@ const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
  * (conversations brutes + dossiers _prive generiques) sans nommer de zones
  * personnelles dans le code source public.
  */
-const FALLBACK_FAIL_CLOSED = ['conversations\\', 'conversations/', '_prive', '_prive\\', '_prive/'];
+/**
+ * Repli si zone-a-patterns illisible (F5 red team 14/10).
+ * Motifs generiques de structure vault : pas de noms de personnes / dossier-sensibles.
+ * Completer via ZONE_A_PATTERNS_FILE (depot prive) en prod.
+ */
+const FALLBACK_FAIL_CLOSED = [
+  'conversations\\',
+  'conversations/',
+  '_prive',
+  '_prive\\',
+  '_prive/',
+  '<dossier-reserve-1>',
+  '<dossier-reserve-1>\\',
+  '<dossier-reserve-1>/',
+  '<dossier-reserve-2>',
+  '<dossier-reserve-2>\\',
+  '<dossier-reserve-2>/',
+  '\\journal\\',
+  '/journal/',
+  'personnes.md',
+  '\\atoms\\',
+  '/atoms/',
+];
 
 export interface ZonePatterns {
   version: string;
@@ -113,7 +135,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       alwaysExclude: FALLBACK_FAIL_CLOSED,
       reserved: [],
       sourcePriority: {},
-      error: `zone-a-patterns illisible (${msg}) - repli fail-closed (conversations + _prive)`,
+      error: `zone-a-patterns illisible (${msg}) - repli fail-closed elargi (conversations, _prive, <dossier-reserve-1>, <dossier-reserve-2>, journal, personnes, atoms)`,
     };
   }
 }
