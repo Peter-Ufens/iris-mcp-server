@@ -27,7 +27,7 @@ Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils
 | Lecture fichiers + Git (status, log, diff, commit) | OK, sandbox `ALLOWED_ROOTS` |
 | 11 APIs cloud sans compte perso | OK (meteo, news HN, traduction, NASA APOD, etc.) |
 | Heure locale (`time-v1`, categorie iris) | OK, Intl serveur (plus de WorldTimeAPI) |
-| Outils web (fetch URL, recherche, Wikipedia, actu RSS) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) · `actu-rss-v1` = flux fixes + Bing/Google (`recherche`) |
+| Outils web (fetch URL, recherche, Wikipedia, actu RSS) | OK, garde anti-SSRF ([securite-web.md](docs/securite-web.md)) · `actu-rss-v1` = flux fixes (dont `officiel` service-public) + Bing/Google (`recherche`) |
 | RAG vault (`rag-query-v1` + `rag-search-v2` + `rag-hybrid-v1`) | OK, local (Qdrant + Ollama) · glossaire prive hors repo |
 | Journal des recherches RAG (opt-in `IRIS_RAG_JOURNAL_DIR`) | OK, desactive par defaut · [docs/rag-journal.md](docs/rag-journal.md) |
 | Zone reservee (`ragReservedContains`, opt-in `includeReserved`) | OK, fermee par defaut et avec `includeZoneA` · [docs/tool-catalog.md](docs/tool-catalog.md) |
@@ -93,7 +93,7 @@ Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-des
 | `fetch-url-v1` | web | Contenu texte d'une URL https (garde SSRF, plafonds) |
 | `web-search-ddg-v1` | web | Recherche DuckDuckGo Instant Answer (sans cle) |
 | `wikipedia-search-v1` | web | Recherche d'articles Wikipedia (API MediaWiki) |
-| `actu-rss-v1` | web | Titres / liens actualite (flux fixes + `recherche=bing|google|les_deux`) |
+| `actu-rss-v1` | web | Titres / liens actualite (flux fixes A + Bing B + zone `officiel` C service-public + recherche bing/google) |
 | `rag-query-v1` | memory | RAG vault rapide (Qdrant + Ollama) |
 | `rag-search-v2` | memory | RAG avec glossaire prive, reformulations, clarification |
 | `rag-hybrid-v1` | memory | RAG vectoriel + lexical : identifiants, noms de fichier, fautes de frappe |

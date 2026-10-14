@@ -183,7 +183,7 @@ Ajoutes en v0.5.0 (+ `actu-rss-v1` en v0.10.0). Sans cle API. Regles reseau : [s
 | `fetch-url-v1` | `fetch-url-v1.ts` | GET https direct, garde SSRF, texte plafonne (HTML converti en texte) |
 | `web-search-ddg-v1` | `web-search-ddg-v1.ts` | DuckDuckGo Instant Answer (api.duckduckgo.com) |
 | `wikipedia-search-v1` | `wikipedia-search-v1.ts` | API MediaWiki (`<lang>.wikipedia.org`) |
-| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + La 1ere Guadeloupe + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times, zone `asie_ia` filtree IA et Asie) + recherche `recherche=bing|google|les_deux` (Bing → items editeur ; Google → decouverte) |
+| `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + La 1ere Guadeloupe + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times, zone `asie_ia` filtree IA et Asie + zone `officiel` service-public voie C) + recherche `recherche=bing|google|les_deux` (Bing → items editeur ; Google → decouverte) |
 
 Entrees / sorties principales :
 
@@ -192,7 +192,7 @@ Entrees / sorties principales :
 | `fetch-url-v1` | `url` (https), `max_chars` (200 a 200000) | `url`, `final_url`, `status`, `content_type`, `format`, `text`, `truncated`, `bytes_approx`, `redirects` |
 | `web-search-ddg-v1` | `query` (1-200), `limit` (1-8, defaut 5) | `query`, `source`, `count`, `results[]` (`title`, `url`, `snippet`), `note` si vide |
 | `wikipedia-search-v1` | `query` (1-200), `lang` (defaut `fr`), `limit` (1-8, defaut 5) | `query`, `lang`, `count`, `total_hits`, `results[]` (`title`, `pageid`, `url`, `snippet`) |
-| `actu-rss-v1` | `zone` (france/alsace/ia/monde/guadeloupe/usa/asie_ia/tout), `query` optionnel, `limit` (1-30), `since_hours` (1-168), `recherche` (aucune/google/bing/les_deux), `google_news` (bool, compat) | `items[]` (Bing : `date_approx` si heure incertaine), `decouverte[]`, `feeds[]`, `recoupement`, `recherche`, `note` |
+| `actu-rss-v1` | `zone` (france/alsace/ia/monde/guadeloupe/usa/asie_ia/officiel/tout), `query` optionnel, `limit` (1-30), `since_hours` (1-168), `recherche` (aucune/google/bing/les_deux), `google_news` (bool, compat) | `items[]` (Bing : `date_approx` si heure incertaine ; voie C officiel : date du **jour**, pas d'heure), `decouverte[]`, `feeds[]`, `recoupement`, `recherche`, `note` |
 
 Limite connue : `web-search-ddg-v1` s'appuie sur l'API Instant Answer, qui n'est pas un
 index web complet. Sur une requete pointue elle peut ne rien retourner : l'outil renvoie
@@ -200,6 +200,7 @@ alors `results: []` et une `note`, pas une erreur.
 
 `actu-rss-v1` ne renvoie **pas** le texte integral des articles (titres + liens + resume court).
 Lire un article : `fetch-url-v1` sur le lien. Bing Actualites (voie B) → `items[]` avec lien editeur https · recherche nationale (`zone` sortie `tout`) · `date_approx: true` = heure Bing approximative (confirmer sur la page editeur). Google Actualites → `decouverte[]` seulement.
+Voie C (`zone=officiel`) : flux `service-public.gouv.fr` (particuliers + pro) · droits / aides / demarches · pas les faits divers · dates = jour civil (pas d'heure fiable).
 
 ## Pattern d'ID
 
