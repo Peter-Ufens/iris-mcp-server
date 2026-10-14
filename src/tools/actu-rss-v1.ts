@@ -20,6 +20,7 @@ type Zone =
   | 'guadeloupe'
   | 'usa'
   | 'asie_ia'
+  | 'officiel'
   | 'tout';
 
 interface FeedDef {
@@ -174,10 +175,25 @@ const FEEDS: FeedDef[] = [
     zones: ['asie_ia'],
     kind: 'discovery',
   },
+  // Voie C / ADR-0010 : sources officielles Etat (droits, aides, demarches).
+  {
+    id: 'service-public-particuliers',
+    name: 'Service-Public particuliers',
+    url: 'https://www.service-public.gouv.fr/abonnements/rss/actu-actualites-particuliers.rss',
+    zones: ['officiel', 'tout'],
+    kind: 'publisher',
+  },
+  {
+    id: 'service-public-pro',
+    name: 'Service-Public pro',
+    url: 'https://www.service-public.gouv.fr/abonnements/rss/actu-actu-pro.rss',
+    zones: ['officiel', 'tout'],
+    kind: 'publisher',
+  },
 ];
 
 const NOTE =
-  'Titres et liens seulement. Usage personnel / non commercial. Titre ≠ fait : lire l’article (fetch-url-v1 ou navigateur) avant d’affirmer. Si date_approx (Bing) : ne pas citer une heure sans la page éditeur. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] ; Google → decouverte[]) : recherche nationale (zone sortie « tout »). Zone alsace = DNA / L’Alsace + France 3 limité Bas-Rhin·Haut-Rhin·alsace. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
+  'Titres et liens seulement. Usage personnel / non commercial. Titre ≠ fait : lire l’article (fetch-url-v1 ou navigateur) avant d’affirmer. Date de publication ≠ date de l’événement si la page le dit. Si date_approx (Bing) : ne pas citer une heure sans la page éditeur. Voie A = flux éditeurs. Voie B = recherche `recherche=bing|google|les_deux` (Bing → items[] ; Google → decouverte[]) : recherche nationale (zone sortie « tout »). Voie C = zone `officiel` (service-public.gouv.fr : droits/aides/démarches, pas faits divers). Zone alsace = DNA / L’Alsace + France 3 limité Bas-Rhin·Haut-Rhin·alsace. Zone ia = ActuIA/Pixels/Siècle Digital. Zone guadeloupe = La 1ère + Google découverte. Zone usa = BBC/NYT. Zone asie_ia = IA∩Asie + Google IA Asie.';
 
 /**
  * Chaque mot de la requete doit commencer un mot du titre ou du resume
@@ -265,7 +281,7 @@ function resolveRecherche(
 export const tool: IrisTool = {
   id: 'actu-rss-v1',
   description:
-    'Actualité via flux RSS fixes (France / Alsace / IA / Guadeloupe / USA / Asie-IA) + recherche Bing/Google. Titres, dates, liens éditeur https. Pas de LLM. ADR-0006/0008.',
+    'Actualité via flux RSS fixes (France / Alsace / IA / Guadeloupe / USA / Asie-IA / officiel service-public) + recherche Bing/Google. Titres, dates, liens éditeur https. Pas de LLM. ADR-0006/0008/0010.',
   category: 'web',
   inputSchema: {
     query: z
@@ -275,10 +291,20 @@ export const tool: IrisTool = {
       .optional()
       .describe('Mots-clés optionnels (filtre titres / résumés ; requis pour recherche Bing/Google)'),
     zone: z
-      .enum(['france', 'alsace', 'ia', 'monde', 'guadeloupe', 'usa', 'asie_ia', 'tout'])
+      .enum([
+        'france',
+        'alsace',
+        'ia',
+        'monde',
+        'guadeloupe',
+        'usa',
+        'asie_ia',
+        'officiel',
+        'tout',
+      ])
       .optional()
       .default('tout')
-      .describe('Choix des flux'),
+      .describe('Choix des flux (officiel = service-public voie C)'),
     since_hours: z
       .number()
       .int()
