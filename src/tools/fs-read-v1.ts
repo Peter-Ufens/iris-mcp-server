@@ -1,10 +1,36 @@
 import * as z from 'zod/v4';
-import { readFile, stat } from 'node:fs/promises';
+import { open, stat } from 'node:fs/promises';
 import type { IrisTool } from './_types.js';
 import { validatePath, PathGuardError } from '../utils/path-guard.js';
 
 const DEFAULT_MAX_CHARS = 200_000;
 const HARD_MAX_CHARS = 200_000;
+
+/**
+ * R4 Bob : ne pas charger tout le fichier en RAM.
+ * Lit assez d'octets pour decoder jusqu'a max_chars (+1 pour detecter la coupe).
+ */
+async function readUtf8Capped(
+  path: string,
+  maxChars: number,
+): Promise<{ content: string; truncated: boolean; size_bytes: number }> {
+  const stats = await stat(path);
+  const byteBudget = Math.min(stats.size, (maxChars + 1) * 4);
+  const fh = await open(path, 'r');
+  try {
+    const buf = Buffer.alloc(byteBudget);
+    const { bytesRead } = await fh.read(buf, 0, byteBudget, 0);
+    let content = buf.subarray(0, bytesRead).toString('utf-8');
+    const truncatedByChars = content.length > maxChars;
+    if (truncatedByChars) {
+      content = content.slice(0, maxChars);
+    }
+    const truncated = truncatedByChars || stats.size > bytesRead;
+    return { content, truncated, size_bytes: stats.size };
+  } finally {
+    await fh.close();
+  }
+}
 
 export const tool: IrisTool = {
   id: 'fs-read-v1',
@@ -26,12 +52,7 @@ export const tool: IrisTool = {
     const maxChars = (input.max_chars as number | undefined) ?? DEFAULT_MAX_CHARS;
     try {
       const safePath = await validatePath(inputPath);
-      const [raw, stats] = await Promise.all([
-        readFile(safePath, 'utf-8'),
-        stat(safePath),
-      ]);
-      const truncated = raw.length > maxChars;
-      const content = truncated ? raw.slice(0, maxChars) : raw;
+      const { content, truncated, size_bytes } = await readUtf8Capped(safePath, maxChars);
       return {
         content: [
           {
@@ -39,7 +60,7 @@ export const tool: IrisTool = {
             text: JSON.stringify(
               {
                 content,
-                size_bytes: stats.size,
+                size_bytes,
                 encoding: 'utf-8',
                 truncated,
                 max_chars: maxChars,

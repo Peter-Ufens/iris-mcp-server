@@ -13,14 +13,17 @@ export class GitCommandError extends Error {
   }
 }
 
-/** Chemins « vides » pour couper hooks / config globale (F1 red team 14/10). */
+/** Chemins « vides » pour couper hooks locaux (F1 red team 14/10). */
 const DEV_NULL = platform() === 'win32' ? 'NUL' : '/dev/null';
 
 /**
  * Prefixe -c pour neutraliser les reglages locaux d'un depot piege
  * (core.fsmonitor, hooksPath, pager).
  * Note : `-c diff.external=` (vide) casse `git diff` sous Windows
- * (« cannot spawn : ») → on utilise `--no-ext-diff` a la place.
+ * (« cannot spawn : ») → on utilise `--no-ext-diff` (+ `--no-textconv` R2).
+ *
+ * R3 Bob : ne PAS mettre GIT_CONFIG_GLOBAL=NUL (casse user.name/email global
+ * de Peter ; la menace depot piege est deja couverte par -c / --no-*).
  */
 const SAFE_GIT_PREFIX = [
   '-c',
@@ -34,7 +37,6 @@ const SAFE_GIT_PREFIX = [
 const SAFE_GIT_ENV: NodeJS.ProcessEnv = {
   ...process.env,
   GIT_CONFIG_NOSYSTEM: '1',
-  GIT_CONFIG_GLOBAL: DEV_NULL,
   GIT_TERMINAL_PROMPT: '0',
 };
 
@@ -50,9 +52,14 @@ export function runGit(repoPath: string, args: string[]): string {
     finalArgs = ['commit', '--no-verify', ...finalArgs.slice(1)];
   }
 
-  // git diff : ignorer diff.external / drivers externes du depot.
-  if (finalArgs[0] === 'diff' && !finalArgs.includes('--no-ext-diff')) {
-    finalArgs = ['diff', '--no-ext-diff', ...finalArgs.slice(1)];
+  // git diff : ignorer diff.external / textconv / drivers du depot (R2).
+  if (finalArgs[0] === 'diff') {
+    if (!finalArgs.includes('--no-ext-diff')) {
+      finalArgs = ['diff', '--no-ext-diff', ...finalArgs.slice(1)];
+    }
+    if (!finalArgs.includes('--no-textconv')) {
+      finalArgs = [finalArgs[0]!, '--no-textconv', ...finalArgs.slice(1)];
+    }
   }
 
   try {
