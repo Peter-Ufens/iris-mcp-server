@@ -349,6 +349,10 @@ describe('actu-rss-v1', () => {
               title: 'Colmar : marche',
               link: 'https://france3-regions.franceinfo.fr/grand-est/haut-rhin/colmar/marche.html',
             },
+            {
+              title: 'Manifestations lyceennes en Alsace',
+              link: 'https://france3-regions.franceinfo.fr/grand-est/alsace/manifestations-lyceennes.html',
+            },
           ]),
         );
       }
@@ -361,6 +365,9 @@ describe('actu-rss-v1', () => {
     );
     expect(urls).toContain(
       'https://france3-regions.franceinfo.fr/grand-est/haut-rhin/colmar/marche.html',
+    );
+    expect(urls).toContain(
+      'https://france3-regions.franceinfo.fr/grand-est/alsace/manifestations-lyceennes.html',
     );
     expect(urls.some((u: string) => u.includes('/marne/'))).toBe(false);
     expect(urls.some((u: string) => u.includes('/nancy/'))).toBe(false);
