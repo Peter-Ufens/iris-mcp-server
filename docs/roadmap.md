@@ -1,11 +1,11 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-10-08) :** **v0.11.2** · **29 outils** · **335 tests** · repo **public** GitHub.  
+> **Etat live (2026-10-14) :** **v0.11.3** · **29 outils** · **337 tests** · repo **public** GitHub · voie C officiel.  
 > Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **actif** (Bing + filtre Alsace).
 
 ---
 
-## Etat present : v0.11.2 (octobre 2026)
+## Etat present : v0.11.3 (octobre 2026)
 
 | Palier | Contenu | Statut |
 |---|---|---|
