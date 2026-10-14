@@ -5,7 +5,7 @@
 
 Serveur MCP (Model Context Protocol) modulaire pour **Iris** : multiprise outils pour Cursor, Claude Desktop et Ollama.
 
-**Version :** `0.11.2` · **29 outils** · **335 tests** Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
+**Version :** `0.11.3` · **29 outils** · Vitest · statut : **socle stable** (extensions prevues, voir roadmap).
 
 ---
 
@@ -65,7 +65,7 @@ node dist/index.js     # stdio MCP (lance par Cursor/Claude)
 
 Brancher dans Cursor ou Claude : voir `docs/cursor-config.md` / `docs/claude-desktop-config.md`.
 
-## Outils disponibles (v0.11.2 - 29)
+## Outils disponibles (v0.11.3 - 29)
 
 | ID | Categorie | Description courte |
 |---|---|---|

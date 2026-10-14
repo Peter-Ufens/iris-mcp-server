@@ -604,4 +604,37 @@ describe('actu-rss-v1', () => {
     expect(schema.safeParse({ recherche: 'les_deux' }).success).toBe(true);
     expect(schema.safeParse({ recherche: 'yahoo' }).success).toBe(false);
   });
+
+  it('schema accepte zone officiel (voie C service-public)', () => {
+    const schema = z.object(actu.inputSchema);
+    expect(schema.safeParse({ zone: 'officiel' }).success).toBe(true);
+  });
+
+  it('zone officiel : ne tire que les flux service-public (pas DNA)', async () => {
+    const spRss = `<?xml version="1.0"?><rss version="2.0"><channel>
+<item>
+  <title>Allocation aux adultes handicapés : déclaration de revenus</title>
+  <link>https://www.service-public.gouv.fr/particuliers/actualites/A19094</link>
+  <dc:date xmlns:dc="http://purl.org/dc/elements/1.1/">${new Date().toISOString()}</dc:date>
+  <description>Procedure officielle</description>
+</item>
+</channel></rss>`;
+    const urls: string[] = [];
+    mockFetch.mockImplementation(async (url: string) => {
+      urls.push(url);
+      if (url.includes('service-public')) return okText(url, spRss);
+      return okText(url, SAMPLE_RSS);
+    });
+    const payload = await run({ zone: 'officiel', limit: 10, since_hours: 48 });
+    expect(payload.zone).toBe('officiel');
+    expect(urls.every((u) => u.includes('service-public'))).toBe(true);
+    expect(urls.some((u) => u.includes('dna.fr'))).toBe(false);
+    expect(payload.items.length).toBeGreaterThanOrEqual(1);
+    expect(
+      payload.items.every((i: { url: string }) =>
+        /service-public\.gouv\.fr/i.test(i.url),
+      ),
+    ).toBe(true);
+    expect(payload.note).toMatch(/Voie C|officiel|service-public/i);
+  });
 });
