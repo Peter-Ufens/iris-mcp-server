@@ -45,7 +45,7 @@ Les modèles **dans le chat** (Claude, Cursor) **appellent** les outils MCP ; **
 |-------|---------|
 | **Livre (v0.5.0)** | MCP local + 24 outils (ping, ollama, fs, git, APIs cloud, fetch/web-search/wikipedia + SSRF). |
 | **Option parallèle** | Serveurs MCP multi-modèles (**pal-mcp-server**, **ollama-mcp**, **Bifrost**, etc.) — voir **`docs/mcp-native-gateways-research.md`**. |
-| **Ensuite** | Outils plus riches (santé Lyla, memoire, etc.) — toujours **un ID par outil**. |
+| **Ensuite** | Outils plus riches (supervision système, memoire, etc.) — toujours **un ID par outil**. |
 | **Plus tard** | HTTP/SSE, demo VAE ([roadmap.md](roadmap.md)). |
 
 ---

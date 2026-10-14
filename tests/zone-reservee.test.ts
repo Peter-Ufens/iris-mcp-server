@@ -7,16 +7,16 @@ import { ragSearch, tool as toolV2 } from '../src/tools/rag-search-v2.js';
 import { ragHybrid, tool as toolHy } from '../src/tools/rag-hybrid-v1.js';
 
 /**
- * Zone reservee (v0.9.0). Donnees FICTIVES : aucun nom de zone, de dossier ou de chemin reel.
+ * zone reservee (v0.9.0). Donnees FICTIVES : aucun nom de zone, de dossier ou de chemin reel.
  *
- * | appel              | A-1 brut | reserved | A-2 personnel |
+ * | appel              | A-1 brut | Reserved | A-2 personnelle stricte |
  * | defaut             | ferme    | ferme       | ferme      |
  * | includeZoneA       | ouvert   | ferme       | ferme      |
  * | includeReserved | ferme    | ouvert      | ferme      |
  * | les deux           | ouvert   | ouvert      | ferme      |
  */
 const PATTERNS = {
-  version: 'test-reserved',
+  version: 'test-reserve',
   ragQueryExcludeContains: ['from-vendor-copilot', 'zone-alpha-sensitive'],
   // « secret-only-always » n'est volontairement PAS recopie dans la liste A-1 : il doit rester ferme partout
   ragAlwaysExcludeContains: ['zone-alpha-sensitive', 'secret-only-always'],
@@ -88,7 +88,7 @@ describe('zone reservee / fichier de zones', () => {
     expect(loadZonePatterns(ecrirePatterns(PATTERNS)).reserved).toEqual(['dossier-reserve-fictif', 'uuid-fictif-0001']);
     const { ragReservedContains: _c, ...sans } = PATTERNS;
     expect(loadZonePatterns(ecrirePatterns(sans)).reserved).toEqual([]);
-    const illisible = loadZonePatterns(join(tmpdir(), 'nexiste-pas-reserved.json'));
+    const illisible = loadZonePatterns(join(tmpdir(), 'nexiste-pas-reserve.json'));
     expect(illisible.reserved).toEqual([]);
     expect(resolveExcludes(illisible, false, true)).toContain('conversations\\'); // repli fail-closed conserve
   });
@@ -146,7 +146,7 @@ describe('zone reservee / les trois outils RAG (Qdrant qui ignore le filtre serv
     }
   });
 
-  it('A-2 jamais ouverte, meme reserved + includeZoneA, meme si le chemin est aussi reserved', async () => {
+  it('A-2 jamais ouverte, meme Reserved + includeZoneA, meme si le chemin est aussi Reserved', async () => {
     const patternsFile = ecrirePatterns(PATTERNS);
     stub();
     const r = await ragQuery({ query: 'zorblat', limit: 25, patternsFile, includeZoneA: true, includeReserved: true });

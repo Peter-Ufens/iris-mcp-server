@@ -422,7 +422,7 @@ export const tool: IrisTool = {
   description:
     'Recherche dans le vault de Peter pour les termes EXACTS : identifiants (nom de machine, code de certification), ' +
     'noms de fichier ou de variable, chemins partiels, noms propres rares, avec tolerance aux lettres voisines inversees. ' +
-    "Combine le vectoriel de rag-query-v1 et une recherche texte dans l'index, memes regles de Zone A (zone personnel jamais ouverte). " +
+    "Combine le vectoriel de rag-query-v1 et une recherche texte dans l'index, memes regles de Zone A (zone personnelle stricte jamais ouverte). " +
     "Pour une question dictee ou en langage naturel, utiliser rag-search-v2.",
   category: 'memory',
   inputSchema: {
@@ -430,8 +430,8 @@ export const tool: IrisTool = {
     limit: z.number().int().min(1).max(25).optional().describe('Nombre de passages (defaut 5, max 25)'),
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
-    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnel A-2 ni la zone reservee.'),
-    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnel A-2."),
+    includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.'),
+    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2."),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
   execute: avecJournal('rag-hybrid-v1', async (input) => {

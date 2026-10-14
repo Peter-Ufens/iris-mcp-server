@@ -15,7 +15,7 @@ import { avecJournal } from '../utils/rag-journal.js';
  *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT (pas la zone reservee)
  *   - includeReserved  : ouvre la zone reservee (ragReservedContains) UNIQUEMENT
  *   - Zone A-2 "personnel"   : JAMAIS ouverte par cet outil, quel que soit l'input.
- *     L'ouverture de l'personnel reste un geste manuel et explicite de Peter :
+ *     L'ouverture de la zone personnelle stricte reste un geste manuel et explicite de Peter :
  *     `query-rag.ps1 -IncludeZoneA -AllowStrictPrivate`.
  *
  * Les motifs ne sont PAS dupliques ici : source unique = zone-a-patterns.json
@@ -34,7 +34,7 @@ const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
  */
 /**
  * Repli si zone-a-patterns illisible (F5 red team 14/10).
- * Motifs generiques de structure vault : pas de noms de personnes / dossier-sensibles.
+ * Motifs generiques de structure vault : pas de noms de personnes / dossier sensibles.
  * Completer via ZONE_A_PATTERNS_FILE (depot prive) en prod.
  */
 const FALLBACK_FAIL_CLOSED = [
@@ -128,7 +128,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    // Config illisible => on reste ferme sur l'personnel ET sur les conversations brutes.
+    // Config illisible => on reste ferme sur le personnel strict ET sur les conversations brutes.
     return {
       version: 'unreadable',
       queryExclude: FALLBACK_FAIL_CLOSED,
@@ -159,15 +159,15 @@ export function isPathExcluded(sourcePath: string, excludeContains: string[]): b
 /**
  * Motifs a exclure pour cette requete.
  *
- * | appel              | A-1 brut | reserved | A-2 personnel |
+ * | appel              | A-1 brut | Reserved | A-2 personnelle stricte |
  * | defaut             | exclu    | exclu       | exclu      |
  * | includeZoneA       | ouvert   | exclu       | exclu      |
  * | includeReserved | exclu    | ouvert      | exclu      |
  * | les deux           | ouvert   | ouvert      | exclu      |
  *
  * A-2 est ajoute dans tous les cas (meme si le fichier ne l'a pas recopie dans la liste A-1).
- * Un chemin a la fois reserved et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
- * Zones illisibles : repli fail-closed et aucun motif reserved connu, rien a ouvrir.
+ * Un chemin a la fois Reserved et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
+ * Zones illisibles : repli fail-closed et aucun motif Reserved connu, rien a ouvrir.
  */
 export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean, includeReserved = false): string[] {
   const base = includeZoneA ? patterns.alwaysExclude : [...patterns.queryExclude, ...patterns.alwaysExclude];
@@ -392,7 +392,7 @@ export const tool: IrisTool = {
   description:
     "Interroge le RAG vault de Peter (Qdrant + embeddings Ollama) et retourne les passages les plus proches. " +
     "Par defaut la Zone A est filtree (conversations brutes exclues) ; includeZoneA=true ouvre les conversations " +
-    "brutes (Copilot, Ollama, Claude) mais JAMAIS la zone personnel, qui reste filtree en toutes circonstances. " +
+    "brutes (Copilot, Ollama, Claude) mais JAMAIS la zone personnelle stricte, qui reste filtree en toutes circonstances. " +
     "La zone reservee reste fermee sauf includeReserved=true (seulement a la demande explicite de l'utilisateur). " +
     'Utiliser project ou sourceContains pour cibler un projet ou une source.',
   category: 'memory',
@@ -411,13 +411,13 @@ export const tool: IrisTool = {
       .boolean()
       .optional()
       .describe(
-        'Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnel A-2 ni la zone reservee.',
+        'Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.',
       ),
     includeReserved: z
       .boolean()
       .optional()
       .describe(
-        "Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnel A-2.",
+        "Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2.",
       ),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
