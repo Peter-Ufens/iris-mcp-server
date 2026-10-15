@@ -20,7 +20,15 @@ async function readUtf8Capped(
   try {
     const buf = Buffer.alloc(byteBudget);
     const { bytesRead } = await fh.read(buf, 0, byteBudget, 0);
-    let content = buf.subarray(0, bytesRead).toString('utf-8');
+    const slice = buf.subarray(0, bytesRead);
+    // Karen redteam 15/10 scenario 050 : refuser le binaire (NUL dans les premiers octets)
+    const probe = slice.subarray(0, Math.min(512, slice.length));
+    if (probe.includes(0)) {
+      throw new PathGuardError(
+        `Fichier binaire refuse (octet NUL detecte). fs-read-v1 lit du texte UTF-8 seulement.`,
+      );
+    }
+    let content = slice.toString('utf-8');
     const truncatedByChars = content.length > maxChars;
     if (truncatedByChars) {
       content = content.slice(0, maxChars);
