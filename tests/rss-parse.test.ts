@@ -161,4 +161,15 @@ describe('rss-parse', () => {
     expect(isBingNewsUrl(apiclick)).toBe(true);
     vi.useRealTimers();
   });
+
+  it('parseFeedXml plafonne une entree enorme (F6, pas de gel CPU)', () => {
+    const bomb =
+      '<?xml version="1.0"?><rss><channel><title>t</title><item><title>' +
+      '<'.repeat(200_000) +
+      '</title></item></channel></rss>';
+    const t0 = Date.now();
+    const items = parseFeedXml(bomb);
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(Array.isArray(items)).toBe(true);
+  });
 });

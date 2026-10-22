@@ -245,16 +245,25 @@ function parseAtomEntries(xml: string): ParsedFeedItem[] {
   return items;
 }
 
+/**
+ * Plafond entree XML (F6 Gaby 22/10 ; baisse 30k apres review Bob ~478 ms a 30k).
+ * Troncature volontaire anti-DoS : au-dela de 30k caracteres, le XML est coupe, donc
+ * les items situes apres la coupe sont ignores (flux d'actualite = titres recents, acceptable).
+ */
+export const PARSE_FEED_XML_MAX_INPUT = 30_000;
+
 export function parseFeedXml(xml: string): ParsedFeedItem[] {
-  if (/<entry\b/i.test(xml) && /<feed\b/i.test(xml)) {
-    return parseAtomEntries(xml);
+  const clipped =
+    xml.length > PARSE_FEED_XML_MAX_INPUT ? xml.slice(0, PARSE_FEED_XML_MAX_INPUT) : xml;
+  if (/<entry\b/i.test(clipped) && /<feed\b/i.test(clipped)) {
+    return parseAtomEntries(clipped);
   }
-  if (/<item\b/i.test(xml)) {
-    return parseRssItems(xml);
+  if (/<item\b/i.test(clipped)) {
+    return parseRssItems(clipped);
   }
   // Atom without explicit feed wrapper still possible
-  if (/<entry\b/i.test(xml)) {
-    return parseAtomEntries(xml);
+  if (/<entry\b/i.test(clipped)) {
+    return parseAtomEntries(clipped);
   }
   return [];
 }

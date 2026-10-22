@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('node:dns/promises', () => ({ lookup: vi.fn() }));
+vi.mock('../src/utils/pinned-fetch.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/utils/pinned-fetch.js')>()),
+  // Tests unitaires : la couche reseau epinglee est remplacee par le fetch simule.
+  pinnedFetch: (url: URL | string, init?: RequestInit) => globalThis.fetch(url, init),
+}));
 
 import { lookup } from 'node:dns/promises';
 import { fetchText, isTextualContentType, MAX_TEXT_CHARS, USER_AGENT } from '../src/utils/http-fetch.js';

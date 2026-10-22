@@ -118,6 +118,31 @@ export function isBlockedIpv6(address: string): boolean {
   if (high === 0xff) return true; // multicast ff00::/8
   if ((high & 0xfe) === 0xfc) return true; // ULA fc00::/7
   if (high === 0xfe && (low & 0xc0) === 0x80) return true; // link-local fe80::/10
+
+  // F7 Gaby 22/10 (+ micro-lot review) : formes encore acceptees a tort.
+  if (parts[0] === 0x64 && parts[1] === 0xff9b) return true; // NAT64 64:ff9b::/96
+  if (parts[0] === 0x2002) return true; // 6to4 2002::/16 (souvent IPv4 embarquee)
+  // site-local deprecate fec0::/10 (pas seulement /16)
+  if ((parts[0]! & 0xffc0) === 0xfec0) return true;
+  if (parts[0] === 0x0100) return true; // discard-only 100::/64 (RFC 6666)
+  // Teredo 2001:0000::/32 (souvent tunnel vers IPv4)
+  if (parts[0] === 0x2001 && parts[1] === 0) return true;
+  // IPv4 translate ::ffff:0:0/96 (distinct de ::ffff:0:0/96 mappe classique deja couvert)
+  if (
+    parts[0] === 0 &&
+    parts[1] === 0 &&
+    parts[2] === 0 &&
+    parts[3] === 0 &&
+    parts[4] === 0xffff &&
+    parts[5] === 0
+  ) {
+    const a = (parts[6]! >> 8) & 0xff;
+    const b = parts[6]! & 0xff;
+    const c = (parts[7]! >> 8) & 0xff;
+    const d = parts[7]! & 0xff;
+    if (isBlockedIpv4(`${a}.${b}.${c}.${d}`)) return true;
+  }
+
   return false;
 }
 

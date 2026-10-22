@@ -1,5 +1,6 @@
 import { SERVER_VERSION } from '../version.js';
 import { assertSafeUrl } from './url-guard.js';
+import { pinnedFetch } from './pinned-fetch.js';
 
 /** User-Agent honnete : pas d'usurpation de navigateur (ADR-0005). */
 export const USER_AGENT = `iris-mcp-server/${SERVER_VERSION}`;
@@ -104,7 +105,8 @@ export async function fetchText(
   let res: Response;
 
   for (;;) {
-    res = await fetch(current, {
+    // D2 : connexion via resolution epinglee (pas de second lookup non controle).
+    res = await pinnedFetch(current, {
       method: 'GET',
       redirect: 'manual',
       headers: {

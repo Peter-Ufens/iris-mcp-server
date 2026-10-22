@@ -5,11 +5,13 @@ import type { IrisTool } from './_types.js';
 import { avecJournal } from '../utils/rag-journal.js';
 import {
   dedupKey,
+  effectiveIncludeReserved,
   isPathExcluded,
   loadZonePatterns,
   resolveExcludes,
   resolvePatternsFile,
   sourceWeight,
+  zonePatternsUnusable,
 } from './rag-query-v1.js';
 
 /**
@@ -622,7 +624,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   const t0 = Date.now();
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
-  const includeReserved = input.includeReserved === true;
+  const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
@@ -663,6 +665,20 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   };
   const meta = result.meta;
   if (patterns.error) meta.error = patterns.error;
+  if (input.includeReserved === true && !includeReserved) {
+    meta.error = [meta.error, 'includeReserved ignore : IRIS_ALLOW_RESERVED=1 requis (F5).']
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (zonePatternsUnusable(patterns)) {
+    // Ne pas ecraser une note F5 deja jointe (review Karen 22/10).
+    if (!meta.error) {
+      meta.error =
+        patterns.error ??
+        'ZONE_A_PATTERNS_FILE requis : RAG refuse sans motifs (fail-closed F4).';
+    }
+    return result;
+  }
   if (!input.query?.trim()) {
     meta.error = 'query vide';
     meta.reformulationNote = '0 reformulation : question vide.';
@@ -735,7 +751,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   try {
     vectors = await embedAll(ollama, embedModel, variants.map((v) => v.text));
   } catch (e) {
-    meta.error = `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`;
+    meta.error = [meta.error, `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
     return result;
   }
   const jobs: Array<Promise<{ variant: Variant; hits: Candidate[] }>> = variants.map((variant, i) =>
@@ -763,7 +779,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   try {
     runs = await Promise.all(jobs);
   } catch (e) {
-    meta.error = `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`;
+    meta.error = [meta.error, `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
     return result;
   }
   const msSearch = Date.now() - tSearch;
@@ -816,7 +832,7 @@ export const tool: IrisTool = {
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
     includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.'),
-    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2."),
+    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee seulement si l'utilisateur le demande ET IRIS_ALLOW_RESERVED=1 (defaut false). N ouvre jamais A-2."),
     reformulate: z.boolean().optional().describe('Reformulations par le modele local (defaut true). false = plus rapide.'),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon

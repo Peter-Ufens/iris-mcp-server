@@ -5,9 +5,12 @@
 > Cette page ne resume que ce que le code applique, pour un lecteur du repo public.
 
 Depuis la v0.5.0, `fetch-url-v1` accepte une **URL fournie par le client** (donc
-potentiellement par un LLM). C'est la seule surface SSRF du serveur : les autres outils
-construisent leurs URL eux-memes. La garde est dans `src/utils/url-guard.ts` et
+potentiellement par un LLM). La garde est dans `src/utils/url-guard.ts` et
 `src/utils/http-fetch.ts`.
+
+**Surfaces reseau (MAJ 22/10) :** `fetch-url-v1` (URL client, garde complete) ;
+`ollama-list-v1` / chat (base **loopback seulement**, `OLLAMA_BASE_URL` hors loopback ignoree) ;
+les flux `actu-rss-v1` utilisent des URL **fixes** ou construites serveur-side (pas d'URL client).
 
 Depuis la v0.10.0, `actu-rss-v1` lit des **flux RSS fixes** (liste dans le code) et,
 si demande, des URL Google / Bing Actualites construites serveur-side. **Aucune URL client.**
@@ -24,7 +27,7 @@ https / liste fixe / pas d'URL client.
 | Credentials | `https://user:pass@hote` refuse |
 | Hotes locaux | `localhost`, `*.localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan` |
 | IPv4 | `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16` (metadonnees cloud), `172.16/12`, `192.168/16`, `100.64/10`, `192.0.0/24`, `198.18/15`, multicast, reserve |
-| IPv6 | `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, formes IPv4 mappees |
+| IPv6 | `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, formes IPv4 mappees / `::ffff:0:x`, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`, site-local `fec0::/10`, discard `100::/64`, Teredo `2001:0::/32` |
 | DNS | Le nom est resolu avant l'appel : un nom public qui pointe vers une IP privee est refuse |
 | Redirections | Pas de suivi automatique. Max 3 sauts, chaque saut repasse la garde |
 | Content-Type | `text/*`, `application/json` (et `*+json`), `application/xml` (et `*+xml`), `application/xhtml+xml`. En-tete absent = traite comme du texte. Tout autre type declare : erreur |
@@ -58,8 +61,12 @@ navigateur, pas de contournement de captcha ou d'anti-bot, pas de telechargement
 binaires. Si un site exige un navigateur reel, `fetch-url-v1` retourne une erreur
 propre : c'est le comportement attendu.
 
-## Limite connue
+## DNS rebinding (corrige)
 
-La verification DNS et l'appel HTTP ne sont pas atomiques (fenetre de DNS rebinding
-theorique). Accepte en mode lab local ; a revoir avant toute exposition HTTP/SSE
-distante (roadmap v1.0.0).
+La resolution DNS est validee au moment de la connexion : `src/utils/pinned-fetch.ts`
+fournit un Agent undici dont le `lookup` refuse toute adresse privee ou reservee, et la
+socket se connecte uniquement aux adresses validees (pas de second lookup non controle).
+L'en-tete Host et le SNI TLS restent ceux de l'URL. Chaque redirection ouvre une nouvelle
+connexion et repasse donc par ce controle, en plus de `assertSafeUrl`.
+Les clients JSON a hote fixe (`fetchJson`, URL construites par le code) ne sont pas
+concernes (ADR-0005).

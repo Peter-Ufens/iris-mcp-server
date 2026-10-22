@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, platform } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { validatePath, PathGuardError } from '../src/utils/path-guard.js';
 
 let testDir: string;
@@ -51,5 +52,61 @@ describe('path-guard', () => {
     await expect(
       validatePath(testDir + 'malicious', [testDir]),
     ).rejects.toThrow(PathGuardError);
+  });
+
+  it('refuse un dossier intermediaire symlink/jonction hors root (F1)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'iris-f1-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'iris-f1-out-'));
+    await writeFile(join(outside, 'secret.txt'), 'LEAK', 'utf-8');
+    const link = join(root, 'via-link');
+    try {
+      if (platform() === 'win32') {
+        execFileSync('cmd', ['/c', 'mklink', '/J', link, outside], { stdio: 'ignore' });
+      } else {
+        await symlink(outside, link, 'dir');
+      }
+      await expect(validatePath(join(link, 'secret.txt'), [root])).rejects.toThrow(PathGuardError);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('refuse un chemin INEXISTANT sous un parent symlink/jonction hors root (F1b)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'iris-f1b-root-'));
+    const outside = await mkdtemp(join(tmpdir(), 'iris-f1b-out-'));
+    const link = join(root, 'via-link');
+    try {
+      if (platform() === 'win32') {
+        execFileSync('cmd', ['/c', 'mklink', '/J', link, outside], { stdio: 'ignore' });
+      } else {
+        await symlink(outside, link, 'dir');
+      }
+      // absent.txt n'existe pas : le chemin logique passerait, mais le parent sort du root.
+      await expect(validatePath(join(link, 'absent.txt'), [root])).rejects.toThrow(PathGuardError);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('accepte un chemin sous une racine qui est elle-meme une jonction (F1 roots)', async () => {
+    const realRoot = await mkdtemp(join(tmpdir(), 'iris-f1r-real-'));
+    await writeFile(join(realRoot, 'f.txt'), 'ok', 'utf-8');
+    const parent = await mkdtemp(join(tmpdir(), 'iris-f1r-parent-'));
+    const aliasRoot = join(parent, 'alias');
+    try {
+      if (platform() === 'win32') {
+        execFileSync('cmd', ['/c', 'mklink', '/J', aliasRoot, realRoot], { stdio: 'ignore' });
+      } else {
+        await symlink(realRoot, aliasRoot, 'dir');
+      }
+      // La racine autorisee est la jonction : un fichier dessous ne doit PAS etre refuse a tort.
+      const result = await validatePath(join(aliasRoot, 'f.txt'), [aliasRoot]);
+      expect(result).toContain('f.txt');
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+      await rm(realRoot, { recursive: true, force: true });
+    }
   });
 });

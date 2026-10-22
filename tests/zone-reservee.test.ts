@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -110,6 +110,48 @@ describe('zone reservee / fichier de zones', () => {
 });
 
 describe('zone reservee / les trois outils RAG (Qdrant qui ignore le filtre serveur)', () => {
+  beforeEach(() => {
+    process.env.IRIS_ALLOW_RESERVED = '1';
+  });
+  afterEach(() => {
+    delete process.env.IRIS_ALLOW_RESERVED;
+  });
+
+  it('sans IRIS_ALLOW_RESERVED : includeReserved est ignore (F5)', async () => {
+    delete process.env.IRIS_ALLOW_RESERVED;
+    const patternsFile = ecrirePatterns(PATTERNS);
+    stub();
+    const r = await ragQuery({ query: 'zorblat', limit: 25, patternsFile, includeReserved: true });
+    expect(r.meta.filterReserved).toBe(true);
+    expect(visibles(r.hits)).toEqual(ATTENDU.defaut);
+    expect(r.meta.error).toMatch(/IRIS_ALLOW_RESERVED/);
+  });
+
+  it('F4+F5 : meta.error garde IRIS_ALLOW_RESERVED si patterns absents', async () => {
+    delete process.env.IRIS_ALLOW_RESERVED;
+    delete process.env.ZONE_A_PATTERNS_FILE;
+    stub();
+    const r = await ragQuery({ query: 'zorblat', limit: 25, includeReserved: true });
+    expect(r.meta.filterReserved).toBe(true);
+    expect(r.hits).toEqual([]);
+    expect(r.meta.error).toMatch(/IRIS_ALLOW_RESERVED/);
+    expect(r.meta.error).toMatch(/ZONE_A_PATTERNS_FILE|fail-closed/);
+  });
+
+  it('F4+F5 : rag-search-v2 et rag-hybrid-v1 gardent aussi IRIS_ALLOW_RESERVED', async () => {
+    delete process.env.IRIS_ALLOW_RESERVED;
+    delete process.env.ZONE_A_PATTERNS_FILE;
+    stub();
+    const s = await ragSearch({ query: 'zorblat', limit: 25, includeReserved: true, reformulate: false });
+    expect(s.hits).toEqual([]);
+    expect(s.meta.error).toMatch(/IRIS_ALLOW_RESERVED/);
+    expect(s.meta.error).toMatch(/ZONE_A_PATTERNS_FILE|fail-closed/);
+    const h = await ragHybrid({ query: 'zorblat', limit: 25, includeReserved: true });
+    expect(h.hits).toEqual([]);
+    expect(h.meta.error).toMatch(/IRIS_ALLOW_RESERVED/);
+    expect(h.meta.error).toMatch(/ZONE_A_PATTERNS_FILE|fail-closed/);
+  });
+
   it('rag-query-v1 : visibilite par cas, filtre serveur et meta', async () => {
     const patternsFile = ecrirePatterns(PATTERNS);
     for (const [nom, opts] of CAS) {

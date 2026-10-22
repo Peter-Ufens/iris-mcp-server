@@ -14,6 +14,7 @@ import { avecJournal } from '../utils/rag-journal.js';
  *   - par defaut          : Zone A filtree (conversations brutes + personnel exclus) et zone reservee fermee
  *   - includeZoneA: true  : ouvre les conversations brutes (A-1) UNIQUEMENT (pas la zone reservee)
  *   - includeReserved  : ouvre la zone reservee (ragReservedContains) UNIQUEMENT
+ *     si IRIS_ALLOW_RESERVED=1 (F5 Gaby 22/10 : pas d'ouverture par le LLM seul)
  *   - Zone A-2 "personnel"   : JAMAIS ouverte par cet outil, quel que soit l'input.
  *     L'ouverture de la zone personnelle stricte reste un geste manuel et explicite de Peter :
  *     `query-rag.ps1 -IncludeZoneA -AllowStrictPrivate`.
@@ -100,7 +101,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       reserved: [],
       sourcePriority: {},
       error:
-        'ZONE_A_PATTERNS_FILE non defini - repli fail-closed. Voir iris-mcp-server-private.',
+        'ZONE_A_PATTERNS_FILE non defini - RAG refuse (fail-closed dur). Voir iris-mcp-server-private.',
     };
   }
   try {
@@ -135,7 +136,7 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       alwaysExclude: FALLBACK_FAIL_CLOSED,
       reserved: [],
       sourcePriority: {},
-      error: `zone-a-patterns illisible (${msg}) - repli fail-closed elargi (conversations, _prive, <dossier-reserve-1>, <dossier-reserve-2>, journal, personnes, atoms)`,
+      error: `zone-a-patterns illisible (${msg}) - RAG refuse (fail-closed dur ; motifs generiques charges mais requete bloquee)`,
     };
   }
 }
@@ -167,12 +168,28 @@ export function isPathExcluded(sourcePath: string, excludeContains: string[]): b
  *
  * A-2 est ajoute dans tous les cas (meme si le fichier ne l'a pas recopie dans la liste A-1).
  * Un chemin a la fois Reserved et A-1 (ou A-2) reste ferme tant que l'autre zone l'est.
- * Zones illisibles : repli fail-closed et aucun motif Reserved connu, rien a ouvrir.
+ * Zones illisibles (env-missing / unreadable) : les outils RAG refusent la requete
+ * (fail-closed dur, F4 Gaby 22/10) : reserved:[] ne doit pas laisser fuiter la zone.
  */
 export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean, includeReserved = false): string[] {
   const base = includeZoneA ? patterns.alwaysExclude : [...patterns.queryExclude, ...patterns.alwaysExclude];
   const out = includeReserved ? base : [...base, ...(patterns.reserved ?? [])];
   return [...new Set(out)];
+}
+
+/** True si le fichier de motifs est absents / illisible (pas de liste reserved fiable). */
+export function zonePatternsUnusable(patterns: ZonePatterns): boolean {
+  return patterns.version === 'env-missing' || patterns.version === 'unreadable';
+}
+
+/**
+ * includeReserved effectif : flag outil ET IRIS_ALLOW_RESERVED=1|true (F5).
+ * Sans env, le flag LLM est ignore (zone reservee reste fermee).
+ */
+export function effectiveIncludeReserved(flag: boolean | undefined): boolean {
+  if (flag !== true) return false;
+  const v = process.env.IRIS_ALLOW_RESERVED?.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
 }
 
 /** Poids doux Lot B : premier motif chemin qui matche (ordre JSON). Defaut 1.0. */
@@ -277,7 +294,7 @@ export interface RagQueryInput {
 export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
-  const includeReserved = input.includeReserved === true;
+  const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = input.collection ?? process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
@@ -301,6 +318,24 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
     },
   };
   if (patterns.error) base.meta.error = patterns.error;
+  if (input.includeReserved === true && !includeReserved) {
+    base.meta.error = [
+      patterns.error,
+      'includeReserved ignore : definir IRIS_ALLOW_RESERVED=1 pour autoriser (F5).',
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  if (zonePatternsUnusable(patterns)) {
+    // Ne pas ecraser une note F5 deja jointe (review Karen 22/10).
+    if (!base.meta.error) {
+      base.meta.error =
+        patterns.error ??
+        'ZONE_A_PATTERNS_FILE requis : RAG refuse sans motifs (fail-closed F4).';
+    }
+    return base;
+  }
 
   if (!input.query || !input.query.trim()) {
     base.meta.error = 'query vide';
@@ -318,7 +353,7 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
     if (!emb.embedding || emb.embedding.length === 0) throw new Error('reponse sans embedding');
     vector = emb.embedding;
   } catch (e) {
-    base.meta.error = `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`;
+    base.meta.error = [base.meta.error, `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
     return base;
   }
 
@@ -349,7 +384,7 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
     )) as { result?: Array<{ score?: number; payload?: Record<string, unknown> }> };
     raw = Array.isArray(res.result) ? res.result : [];
   } catch (e) {
-    base.meta.error = `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`;
+    base.meta.error = [base.meta.error, `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
     return base;
   }
 
@@ -393,7 +428,7 @@ export const tool: IrisTool = {
     "Interroge le RAG vault de Peter (Qdrant + embeddings Ollama) et retourne les passages les plus proches. " +
     "Par defaut la Zone A est filtree (conversations brutes exclues) ; includeZoneA=true ouvre les conversations " +
     "brutes (Copilot, Ollama, Claude) mais JAMAIS la zone personnelle stricte, qui reste filtree en toutes circonstances. " +
-    "La zone reservee reste fermee sauf includeReserved=true (seulement a la demande explicite de l'utilisateur). " +
+    "La zone reservee reste fermee sauf includeReserved=true ET IRIS_ALLOW_RESERVED=1 (demande explicite + frein serveur). " +
     'Utiliser project ou sourceContains pour cibler un projet ou une source.',
   category: 'memory',
   inputSchema: {
@@ -417,7 +452,7 @@ export const tool: IrisTool = {
       .boolean()
       .optional()
       .describe(
-        "Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2.",
+        "Ouvre la zone reservee (privee sensible) seulement si l'utilisateur le demande ET IRIS_ALLOW_RESERVED=1 (defaut false). N ouvre jamais la zone personnelle stricte A-2.",
       ),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon

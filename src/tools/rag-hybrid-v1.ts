@@ -3,12 +3,14 @@ import type { IrisTool } from './_types.js';
 import { avecJournal } from '../utils/rag-journal.js';
 import {
   dedupKey,
+  effectiveIncludeReserved,
   isPathExcluded,
   loadZonePatterns,
   ragQuery,
   resolveExcludes,
   resolvePatternsFile,
   sourceWeight,
+  zonePatternsUnusable,
 } from './rag-query-v1.js';
 
 /**
@@ -240,7 +242,7 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   const t0 = Date.now();
   const limit = Math.min(Math.max(input.limit ?? 5, 1), 25);
   const includeZoneA = input.includeZoneA === true;
-  const includeReserved = input.includeReserved === true;
+  const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
   const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
@@ -263,6 +265,20 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   };
   const meta = result.meta;
   if (patterns.error) meta.error = patterns.error;
+  if (input.includeReserved === true && !includeReserved) {
+    meta.error = [meta.error, 'includeReserved ignore : IRIS_ALLOW_RESERVED=1 requis (F5).']
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (zonePatternsUnusable(patterns)) {
+    // Ne pas ecraser une note F5 deja jointe (review Karen 22/10).
+    if (!meta.error) {
+      meta.error =
+        patterns.error ??
+        'ZONE_A_PATTERNS_FILE requis : RAG refuse sans motifs (fail-closed F4).';
+    }
+    return result;
+  }
   if (!input.query?.trim()) {
     meta.error = 'query vide';
     return result;
@@ -411,7 +427,7 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   } else if (docs.size === 0 && !lexError) {
     meta.conseil = "Aucun terme trouve tel quel ni avec une inversion de lettres : resultats vectoriels seulement. Verifier l'orthographe, ou le fichier n'est peut-etre pas encore indexe.";
   }
-  const errors = [vec.meta.error, lexError].filter(Boolean);
+  const errors = [meta.error, vec.meta.error, lexError].filter(Boolean);
   if (errors.length) meta.error = errors.join(' | ');
   meta.timingsMs = { vectoriel: msVec, lexical: msLex, total: Date.now() - t0 };
   return result;
@@ -431,7 +447,7 @@ export const tool: IrisTool = {
     project: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'Virtualisation-HyperV'"),
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
     includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.'),
-    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee (privee sensible), seulement si l'utilisateur demande explicitement cette zone (defaut false). N ouvre jamais la zone personnelle stricte A-2."),
+    includeReserved: z.boolean().optional().describe("Ouvre la zone reservee seulement si l'utilisateur le demande ET IRIS_ALLOW_RESERVED=1 (defaut false). N ouvre jamais A-2."),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
   execute: avecJournal('rag-hybrid-v1', async (input) => {

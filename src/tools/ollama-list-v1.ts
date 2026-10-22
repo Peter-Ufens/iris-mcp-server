@@ -1,12 +1,34 @@
-import * as z from 'zod/v4';
 import type { IrisTool } from './_types.js';
 
 const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434';
 
-function resolveBase(endpoint?: string): string {
-  if (endpoint?.trim()) return endpoint.trim().replace(/\/+$/, '');
+/**
+ * Base Ollama : uniquement env OLLAMA_BASE_URL ou loopback local.
+ * Pas d'URL client (F3 Gaby 22/10 : endpoint libre = SSRF).
+ */
+export function resolveOllamaBaseUrl(): string {
   const fromEnv = process.env.OLLAMA_BASE_URL?.trim();
-  return (fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_OLLAMA_BASE).replace(/\/+$/, '');
+  const base = (fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_OLLAMA_BASE).replace(/\/+$/, '');
+  let u: URL;
+  try {
+    u = new URL(base);
+  } catch {
+    return DEFAULT_OLLAMA_BASE;
+  }
+  const host = u.hostname.toLowerCase();
+  const loopback =
+    host === '127.0.0.1' ||
+    host === 'localhost' ||
+    host === '::1' ||
+    host === '[::1]';
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    return DEFAULT_OLLAMA_BASE;
+  }
+  if (!loopback) {
+    // Env pointe hors loopback : on refuse (SSRF) et on retombe sur le defaut local.
+    return DEFAULT_OLLAMA_BASE;
+  }
+  return base;
 }
 
 export interface OllamaModel {
@@ -52,16 +74,11 @@ export async function fetchOllamaModels(
 export const tool: IrisTool = {
   id: 'ollama-list-v1',
   description:
-    'Liste les modeles Ollama installes sur la machine locale (GET /api/tags). Retourne une erreur propre si Ollama est eteint.',
+    'Liste les modeles Ollama installes en local (GET /api/tags sur 127.0.0.1 ou OLLAMA_BASE_URL loopback). Pas d URL client (anti-SSRF).',
   category: 'ollama',
-  inputSchema: {
-    endpoint: z
-      .string()
-      .optional()
-      .describe('URL de base Ollama (optionnel ; sinon OLLAMA_BASE_URL ou 127.0.0.1:11434)'),
-  },
-  execute: async (input) => {
-    const base = resolveBase(input.endpoint as string | undefined);
+  inputSchema: {},
+  execute: async () => {
+    const base = resolveOllamaBaseUrl();
     const result = await fetchOllamaModels(base);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],

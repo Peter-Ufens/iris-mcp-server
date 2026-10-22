@@ -1,6 +1,6 @@
 # MCP open source — comprendre, local, et brancher Cursor + Claude
 
-> **MAJ etat live (2026-08-07) :** v0.5.0 · **24 outils** · canon = ce depot · repo GitHub **public**.  
+> **MAJ etat live (2026-10-22) :** v0.12.0 · **29 outils** · **404** tests · canon = ce depot · repo GitHub **public**.  
 > Config Cursor : [cursor-config.md](cursor-config.md) (pas `mcp-cursor-config.md`).
 
 **Pour Peter** — 2026-04-12, relecture juillet 2026.
@@ -43,7 +43,7 @@ Les modèles **dans le chat** (Claude, Cursor) **appellent** les outils MCP ; **
 
 | Étape | Contenu |
 |-------|---------|
-| **Livre (v0.5.0)** | MCP local + 24 outils (ping, ollama, fs, git, APIs cloud, fetch/web-search/wikipedia + SSRF). |
+| **Livre (v0.12.0)** | MCP local + **29** outils (ping, ollama, fs, git, APIs cloud, fetch/web-search/wikipedia + actu RSS/Bing/officiel, RAG + SSRF). |
 | **Option parallèle** | Serveurs MCP multi-modèles (**pal-mcp-server**, **ollama-mcp**, **Bifrost**, etc.) — voir **`docs/mcp-native-gateways-research.md`**. |
 | **Ensuite** | Outils plus riches (supervision système, memoire, etc.) — toujours **un ID par outil**. |
 | **Plus tard** | HTTP/SSE, demo VAE ([roadmap.md](roadmap.md)). |
@@ -67,4 +67,4 @@ Si l'objectif est **Cursor + Claude Desktop + Ollama local + APIs cloud** sans r
 
 ---
 
-*Recharge le MCP dans Cursor apres `npm run build` pour voir les 24 outils via `iris-ping-v1`.*
+*Recharge le MCP dans Cursor apres `npm run build` pour voir les 29 outils via `iris-ping-v1`.*

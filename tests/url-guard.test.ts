@@ -101,6 +101,16 @@ describe('url-guard : hotes locaux et prives', () => {
     expect(isBlockedIpv6('2001:4860:4860::8888')).toBe(false);
   });
 
+  it('isBlockedIpv6 : NAT64 / 6to4 / fec0 / 100:: / ::ffff:0:x (F7)', () => {
+    expect(isBlockedIpv6('64:ff9b::7f00:1')).toBe(true);
+    expect(isBlockedIpv6('2002:7f00:1::')).toBe(true);
+    expect(isBlockedIpv6('fec0::1')).toBe(true);
+    expect(isBlockedIpv6('fec1::1')).toBe(true); // fec0::/10
+    expect(isBlockedIpv6('100::1')).toBe(true);
+    expect(isBlockedIpv6('::ffff:0:7f00:1')).toBe(true);
+    expect(isBlockedIpv6('2001::1')).toBe(true); // Teredo 2001:0::/32
+  });
+
   it('isBlockedHost : nom public non bloque', () => {
     expect(isBlockedHost('example.com')).toBe(false);
     expect(isBlockedHost('example.com.')).toBe(false);

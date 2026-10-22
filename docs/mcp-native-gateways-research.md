@@ -8,8 +8,7 @@
 
 ## Où est LiteLLM chez Peter (éviter la confusion)
 
-Ce n’est **pas** un dossier `LiteLLM\` à la racine de `IA` : la config, les scripts et la doc vivent sous  
-**`<HOME>/Ollama-local/`** (voir `docs\litellm-cursor-proxy.example.yaml`, `docs\LITELLM-AUTOSTART-WINDOWS.md`). Carte complète : **`docs/peter-ia-infrastructure-map.md`**.
+Ce n’est **pas** un dossier `LiteLLM\` à la racine du labo : la config, les scripts et la doc vivent à côté d’Ollama (voir `docs\litellm-cursor-proxy.example.yaml`, `docs\LITELLM-AUTOSTART-WINDOWS.md`). Carte complète : **`docs/peter-ia-infrastructure-map.md`**.
 
 ---
 

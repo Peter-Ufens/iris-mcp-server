@@ -1,6 +1,6 @@
 # Roadmap iris-mcp-server
 
-> **Etat live (2026-10-14) :** **v0.12.0** · **29 outils** · **350 tests** · repo **public** GitHub · voie C officiel · harden secu F1–F5 · API zone reservee (`includeReserved`).  
+> **Etat live (2026-10-22) :** **v0.12.0** · **29 outils** · **404 tests** · repo **public** GitHub · voie C officiel · harden secu F1–F9 (lot Gaby) · API zone reservee (`includeReserved` + `IRIS_ALLOW_RESERVED`).  
 > Extensions (Lyla `memory-*`, HTTP/SSE, Veille IA) : roadmap, pas urgent. Hub Iris-MCP = lot actu **cloture** (Bing + Alsace + officiel).
 
 ---
@@ -116,7 +116,7 @@ Detail : hub `planning/backlog-cli-iris-2026-09-02.md`.
 ## Hors scope (projets separes)
 
 - **n8n / Nora** : orchestration (appelle Iris)
-- **Ollama / LLM local** : LLM local
+- **Ollama** : LLM local
 - **Produit compagnon** (memoire / voix) : hors de ce depot
 - **Hub docs local** (planning, ADR) : hors de ce depot public
 
