@@ -85,6 +85,6 @@ Le plan v9 doit etre lu avec les corrections suivantes :
 - Plan v9 section 1-3 (architecture originale hub, maintenant depassee)
 - Session Sharon-001 du 11/04/2026 18h00 (decision Peter verbatim)
 - https://github.com/modelcontextprotocol/servers
-- https://spec.modelcontextprotocol.io/
+- https://modelcontextprotocol.io/specification/latest
 - `iris-mcp-server/README.md` (architecture cible)
 - `tech-watch/update-policy.json` (politique 4 mois)

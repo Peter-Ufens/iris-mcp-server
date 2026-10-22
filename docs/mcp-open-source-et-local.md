@@ -9,7 +9,7 @@
 
 ## 1. C'est quoi, un « serveur MCP open source » ?
 
-- **MCP** (Model Context Protocol) est un **standard ouvert** ([spec](https://spec.modelcontextprotocol.io/)). Ce n'est pas un produit fermé.
+- **MCP** (Model Context Protocol) est un **standard ouvert** ([spec](https://modelcontextprotocol.io/specification/latest)). Ce n'est pas un produit fermé.
 - Le **SDK TypeScript** qu'utilise Iris (`@modelcontextprotocol/sdk`, licence MIT) est **open source** : c'est le même socle que beaucoup d'exemples officiels.
 - Le dépôt **[modelcontextprotocol/servers](https://github.com/modelcontextprotocol/servers)** regroupe des **serveurs de référence** (fichiers, Git, SQLite, etc.), souvent lançables avec `npx …`. Tu peux les utiliser **en parallèle** d'Iris : Cursor et Claude Desktop supportent **plusieurs** serveurs MCP en même temps.
 
