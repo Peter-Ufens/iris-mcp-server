@@ -7,6 +7,7 @@ import {
   loadZonePatterns,
   isPathExcluded,
   resolveExcludes,
+  zonePatternsUnusable,
 } from '../src/tools/rag-query-v1.js';
 
 /** Ecrit un zone-a-patterns.json temporaire et retourne son chemin. */
@@ -90,12 +91,20 @@ describe('rag-query-v1 / zone patterns', () => {
     expect(p.error).toContain('ZONE_A_PATTERNS_FILE');
   });
 
-  it('fichier sans ragAlwaysExcludeContains => repli fail-closed', () => {
-    const p = loadZonePatterns(
-      writePatterns({ version: 'vieux', ragQueryExcludeContains: ['private-life-zone'] }),
-    );
+  it('fichier sans ragAlwaysExcludeContains => repli fail-closed et refus RAG (G6)', async () => {
+    const file = writePatterns({ version: 'vieux', ragQueryExcludeContains: ['private-life-zone'] });
+    const p = loadZonePatterns(file);
     expect(p.alwaysExclude).toContain('conversations/');
     expect(p.alwaysExclude).not.toContain('zone-alpha-sensitive');
+    // G6 22/10 : fichier sans zone toujours exclue => RAG refuse (plus de requete sur le repli).
+    expect(p.version).toBe('no-always-exclude');
+    expect(p.error).toContain('ragAlwaysExcludeContains');
+    expect(zonePatternsUnusable(p)).toBe(true);
+    stubFetch([`${V}notes\\a.md`]);
+    const r = await ragQuery({ query: 'x', limit: 5, patternsFile: file });
+    expect(r.hits).toHaveLength(0);
+    expect(r.meta.error).toContain('ragAlwaysExcludeContains');
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 
   it('isPathExcluded : contains, insensible casse et separateur', () => {

@@ -21,7 +21,7 @@ import { tool as fsRead } from '../src/tools/fs-read-v1.js';
 import { tool as gitStatus } from '../src/tools/git-status-v1.js';
 import { tool as gitDiff } from '../src/tools/git-diff-v1.js';
 import { tool as gitCommit } from '../src/tools/git-commit-v1.js';
-import { loadZonePatterns } from '../src/tools/rag-query-v1.js';
+import { loadZonePatterns, zonePatternsUnusable } from '../src/tools/rag-query-v1.js';
 
 describe('F2 htmlToText plafond / borne', () => {
   it('reste rapide sur beaucoup de < (≤ 2 s, plafond 100k deja applique)', () => {
@@ -276,7 +276,7 @@ describe('R3 F1 commit avec identite globale seulement', () => {
 });
 
 describe('F5 RAG fallback fail-closed elargi', () => {
-  it('sans ZONE_A_PATTERNS_FILE : couvre <dossier-reserve-1> / journal / personnes / atoms', () => {
+  it('sans ZONE_A_PATTERNS_FILE : repli generique (conversations / prive / journal / personnes / atoms) et refus', () => {
     const prev = process.env.ZONE_A_PATTERNS_FILE;
     delete process.env.ZONE_A_PATTERNS_FILE;
     try {
@@ -285,13 +285,12 @@ describe('F5 RAG fallback fail-closed elargi', () => {
         expect.arrayContaining([
           'conversations/',
           '_prive',
-          '<dossier-reserve-1>',
-          '<dossier-reserve-2>',
           '/journal/',
           'personnes.md',
           '/atoms/',
         ]),
       );
+      expect(zonePatternsUnusable(p)).toBe(true);
     } finally {
       if (prev === undefined) delete process.env.ZONE_A_PATTERNS_FILE;
       else process.env.ZONE_A_PATTERNS_FILE = prev;

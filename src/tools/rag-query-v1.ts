@@ -34,9 +34,10 @@ const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
  * personnelles dans le code source public.
  */
 /**
- * Repli si zone-a-patterns illisible (F5 red team 14/10).
- * Motifs generiques de structure vault : pas de noms de personnes / dossier sensibles.
- * Completer via ZONE_A_PATTERNS_FILE (depot prive) en prod.
+ * Repli si zone-a-patterns absent, illisible ou sans ragAlwaysExcludeContains (F5 red team 14/10).
+ * Dans ces trois cas le RAG refuse la requete (zonePatternsUnusable) : ce repli ne sert qu'a
+ * garder des listes non vides. Motifs generiques seulement (aucun nom de dossier du vault).
+ * Les vrais motifs : ZONE_A_PATTERNS_FILE (depot prive) en prod.
  */
 const FALLBACK_FAIL_CLOSED = [
   'conversations\\',
@@ -44,12 +45,6 @@ const FALLBACK_FAIL_CLOSED = [
   '_prive',
   '_prive\\',
   '_prive/',
-  '<dossier-reserve-1>',
-  '<dossier-reserve-1>\\',
-  '<dossier-reserve-1>/',
-  '<dossier-reserve-2>',
-  '<dossier-reserve-2>\\',
-  '<dossier-reserve-2>/',
   '\\journal\\',
   '/journal/',
   'personnes.md',
@@ -114,10 +109,19 @@ export function loadZonePatterns(file?: string | null): ZonePatterns {
       ragReservedContains?: string[];
       ragSourcePriority?: Record<string, number>;
     };
-    const always =
-      Array.isArray(j.ragAlwaysExcludeContains) && j.ragAlwaysExcludeContains.length > 0
-        ? j.ragAlwaysExcludeContains
-        : FALLBACK_FAIL_CLOSED;
+    if (!Array.isArray(j.ragAlwaysExcludeContains) || j.ragAlwaysExcludeContains.length === 0) {
+      // Fichier lisible mais sans zone toujours exclue : on refuse (fail-closed dur, G6 22/10).
+      return {
+        version: 'no-always-exclude',
+        queryExclude: FALLBACK_FAIL_CLOSED,
+        alwaysExclude: FALLBACK_FAIL_CLOSED,
+        reserved: [],
+        sourcePriority: {},
+        error:
+          'zone-a-patterns sans ragAlwaysExcludeContains - RAG refuse (fail-closed dur). Voir iris-mcp-server-private.',
+      };
+    }
+    const always = j.ragAlwaysExcludeContains;
     const sourcePriority =
       j.ragSourcePriority && typeof j.ragSourcePriority === 'object' ? j.ragSourcePriority : {};
     return {
@@ -179,7 +183,11 @@ export function resolveExcludes(patterns: ZonePatterns, includeZoneA: boolean, i
 
 /** True si le fichier de motifs est absents / illisible (pas de liste reserved fiable). */
 export function zonePatternsUnusable(patterns: ZonePatterns): boolean {
-  return patterns.version === 'env-missing' || patterns.version === 'unreadable';
+  return (
+    patterns.version === 'env-missing' ||
+    patterns.version === 'unreadable' ||
+    patterns.version === 'no-always-exclude'
+  );
 }
 
 /**
