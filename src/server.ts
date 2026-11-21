@@ -20,7 +20,11 @@ export async function createIrisMcpServer(): Promise<McpServer> {
   for (const tool of tools) {
     server.registerTool(
       tool.id,
-      { description: tool.description, inputSchema: tool.inputSchema },
+      {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      },
       tool.execute,
     );
   }

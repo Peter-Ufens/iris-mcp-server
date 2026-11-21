@@ -38,10 +38,15 @@ export function createPinnedLookup(resolver: Resolver = dnsLookup as unknown as 
             );
           }
         }
+        // Preferer IPv4 si present (box avec DNS64 : AAAA NAT64 + A). Ordre seulement :
+        // toutes les adresses ont deja ete validees ci-dessus (mesure 14/11 : 200 dans les
+        // deux familles, la preference evite seulement le detour NAT64).
+        const v4 = addresses.filter((a) => a.family === 4 || isIP(a.address) === 4);
+        const ordered = v4.length > 0 ? [...v4, ...addresses.filter((a) => !v4.includes(a))] : addresses;
         if (wantAll) {
-          (callback as unknown as (e: null, a: Array<{ address: string; family: number }>) => void)(null, addresses);
+          (callback as unknown as (e: null, a: Array<{ address: string; family: number }>) => void)(null, ordered);
         } else {
-          const first = addresses[0]!;
+          const first = ordered[0]!;
           callback(null, first.address, first.family);
         }
       })

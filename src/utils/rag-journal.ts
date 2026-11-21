@@ -21,6 +21,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { ToolResult } from '../tools/_types.js';
+import { dossierPermisSousTest } from './garde-test.js';
 
 export const JOURNAL_ENV = 'IRIS_RAG_JOURNAL_DIR';
 export const FENETRE_ENV = 'IRIS_RAG_JOURNAL_FENETRE_MIN';
@@ -89,7 +90,8 @@ export function reinitialiserJournal(): void {
 
 export function dossierJournal(): string | null {
   const d = process.env[JOURNAL_ENV]?.trim();
-  return d ? d : null;
+  // Review Gaby 21/11 : sous test, jamais un vrai dossier (le journal RAG garde le texte des requetes).
+  return d && dossierPermisSousTest(d) ? d : null;
 }
 
 function fenetreMs(): number {

@@ -82,6 +82,107 @@ export function assertWindowsPathSyntax(inputPath: string): void {
   }
 }
 
+/** Lisibles malgre un nom proche : modeles sans valeur, cles SSH PUBLIQUES. */
+const SECRET_NAME_ALLOWED: readonly RegExp[] = [
+  /^\.env\.(example|sample|template|dist)$/i, // .env.example...
+  /^id_[a-z0-9]+.*\.pub$/i, // id_rsa.pub, id_ed25519_github.pub
+];
+
+/**
+ * S0 (Bob 14/11) : fichiers de secrets que fs-read-v1 ne lit jamais, meme sous
+ * ALLOWED_ROOTS. Avant, un `.env` sous une racine large (ex. dossier des projets) etait
+ * lu en entier : une agente (ou une page web piegee qui la pousse) pouvait recuperer
+ * une cle d'ecriture. Comparaison sur le NOM du fichier, insensible a la casse.
+ * S0-bis (review Gaby + Bob 14/11) : copies (.env~, .bak), cles SSH avec suffixe,
+ * jetons d'outils, fichiers de comptes de service, etats Terraform.
+ */
+const SECRET_NAME_PATTERNS: readonly RegExp[] = [
+  /^\.env$/i, // .env
+  /^\.env[.~_-]/i, // .env.local, .env~, .env_backup, .env-prod
+  /^\.envrc$/i, // direnv
+  /\.env$/i, // prod.env, docker.env
+  /\.env(~|\.(bak|old|orig|save|backup|prev|tmp|swp|copy))$/i, // prod.env.bak, docker.env.old
+  /\.(pem|key|p12|pfx|ppk|kdbx|keystore|jks)$/i, // cles, certificats, coffres
+  /\.(tfvars|tfstate)$/i, // Terraform : variables et etat (secrets d'infra)
+  /\.(tfvars\.json|tfstate\.backup)$/i,
+  /^id_(rsa|dsa|ecdsa|ed25519)([._-].*)?$/i, // cles SSH privees (+ id_rsa_old, id_ed25519_github)
+  /^\.(git-credentials|netrc|npmrc|pypirc|pgpass|htpasswd|dockercfg)$/i, // jetons d'outils
+  /^secrets?\.[a-z0-9]+$/i, // secrets.json, secret.yaml, secrets.h
+  /^credentials(\.[a-z0-9]+)?$/i, // credentials, credentials.json
+  /credentials?[^\\/]*\.(json|ya?ml|ini|txt|xml|csv)$/i, // gcp-credentials.json
+  /^service[-_]?account[^\\/]*\.json$/i, // service-account.json
+  /^client[-_]?secrets?[^\\/]*\.json$/i, // client_secret_123.json
+  /^(api[-_]?keys?|(access[-_]?|auth[-_]?)?tokens?)\.(txt|env)$/i, // token.txt, api-key.txt
+  /^(api[-_]?keys?|(access|auth)[-_]?tokens?)\.(json|ya?ml)$/i, // api-keys.json (pas tokens.json : design)
+  /^(mcp\.json|claude_desktop_config\.json)$/i, // configs MCP (portent des cles)
+];
+
+/**
+ * Dossiers dont fs-read-v1 ne lit aucun fichier : `.git` (config avec jeton possible),
+ * dossiers de cles (.ssh, .aws, .gnupg...), et tout dossier nomme `secrets`.
+ */
+const SECRET_DIR_SEGMENTS: ReadonlySet<string> = new Set([
+  '.git',
+  '.ssh',
+  '.aws',
+  '.azure',
+  '.gnupg',
+  '.kube',
+  '.docker',
+  'secrets',
+  'secret',
+]);
+
+function segments(p: string): string[] {
+  return p.split(/[\\/]+/).filter((s) => s !== '');
+}
+
+/** Dernier segment d'un chemin, quel que soit le separateur (pur, testable sous Linux). */
+function lastSegment(p: string): string {
+  const parts = segments(p);
+  return parts.length > 0 ? parts[parts.length - 1]! : '';
+}
+
+/** Vrai si le nom de fichier designe un secret (voir SECRET_NAME_PATTERNS). */
+export function isSecretFileName(name: string): boolean {
+  const n = lastSegment(name);
+  if (n === '' || SECRET_NAME_ALLOWED.some((re) => re.test(n))) return false;
+  return SECRET_NAME_PATTERNS.some((re) => re.test(n));
+}
+
+/** Nom du dossier de secrets traverse par le chemin (hors dernier segment), sinon null. */
+export function secretDirectoryIn(p: string): string | null {
+  const parts = segments(p);
+  for (const s of parts.slice(0, -1)) {
+    if (SECRET_DIR_SEGMENTS.has(s.toLowerCase())) return s;
+  }
+  return null;
+}
+
+/**
+ * Refuse la lecture si l'un des chemins (demande ET resolu par realpath) est un fichier
+ * de secrets ou passe par un dossier de secrets. Les deux sont testes : un lien
+ * `notes.txt` vers `.env` est refuse aussi. Limite connue : un lien PHYSIQUE (hardlink)
+ * au nom innocent n'est pas detectable par le nom (Iris ne sait pas en creer).
+ */
+export function assertNotSecretFile(...paths: string[]): void {
+  const consigne =
+    "Iris ne le lit jamais : ne pas chercher a contourner (copie, autre outil). Demander a l'utilisateur.";
+  for (const p of paths) {
+    if (isSecretFileName(p)) {
+      throw new PathGuardError(
+        `Acces refuse : "${lastSegment(p)}" est un fichier de secrets (cle, mot de passe, configuration). ${consigne}`,
+      );
+    }
+    const dossier = secretDirectoryIn(p);
+    if (dossier) {
+      throw new PathGuardError(
+        `Acces refuse : le dossier "${dossier}" contient des secrets (cles, jetons, configuration). ${consigne}`,
+      );
+    }
+  }
+}
+
 /**
  * Comparaison chemin / racine. Sous Windows (`win32Mode`) : insensible a la casse et
  * aux separateurs (C:\Data == c:/data), car NTFS l'est par defaut.

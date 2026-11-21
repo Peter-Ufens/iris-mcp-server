@@ -1,0 +1,5 @@
+# Filet fins de ligne (Bob + Gaby 16/11) : LF en dépôt, quel que soit autocrlf local.
+* text=auto eol=lf
+
+# Les patchs privés / exportés restent binaires côté intention (pas de conversion).
+*.patch -text

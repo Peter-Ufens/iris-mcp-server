@@ -8,8 +8,9 @@ vi.mock('../src/utils/pinned-fetch.js', async (importOriginal) => ({
 }));
 
 import { lookup } from 'node:dns/promises';
-import { fetchText, isTextualContentType, MAX_TEXT_CHARS, USER_AGENT } from '../src/utils/http-fetch.js';
+import { fetchJson, fetchText, isTextualContentType, MAX_TEXT_CHARS, USER_AGENT } from '../src/utils/http-fetch.js';
 import { UrlGuardError } from '../src/utils/url-guard.js';
+import { resetHttpCacheForTests } from '../src/utils/http-cache.js';
 
 const mockLookup = vi.mocked(lookup);
 const mockFetch = vi.fn();
@@ -23,6 +24,7 @@ function redirectResponse(location: string, status = 302): Response {
 }
 
 beforeEach(() => {
+  resetHttpCacheForTests();
   mockLookup.mockReset();
   mockLookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }] as never);
   mockFetch.mockReset();
@@ -31,6 +33,19 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('fetchJson : marque d ordre d octets (review Bob 16/11)', () => {
+  it('une reponse qui commence par un BOM se lit comme avant (res.json le tolerait)', async () => {
+    const bom = String.fromCharCode(0xfeff);
+    mockFetch.mockResolvedValue(new Response(bom + '{"ok":true,"n":2}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    await expect(fetchJson<{ ok: boolean; n: number }>('https://api.example/x')).resolves.toEqual({ ok: true, n: 2 });
+  });
+
+  it('sans BOM : inchange', async () => {
+    mockFetch.mockResolvedValue(new Response('{"a":1}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    await expect(fetchJson<{ a: number }>('https://api.example/y')).resolves.toEqual({ a: 1 });
+  });
 });
 
 describe('isTextualContentType', () => {
@@ -142,6 +157,18 @@ describe('fetchText : erreurs HTTP et types', () => {
   it('remonte une erreur sur HTTP 404', async () => {
     mockFetch.mockResolvedValue(textResponse('absent', 'text/plain', 404));
     await expect(fetchText('https://example.com/')).rejects.toThrow(/HTTP 404/);
+  });
+
+  it('HTTP 403 : message clair, pas de contournement (review I1)', async () => {
+    mockFetch.mockResolvedValue(textResponse('interdit', 'text/html', 403));
+    await expect(fetchText('https://example.com/')).rejects.toThrow(
+      /HTTP 403 .*refuse les lecteurs automatiques.*ne contourne pas/,
+    );
+  });
+
+  it('HTTP 429 : demander de ralentir, sans boucle', async () => {
+    mockFetch.mockResolvedValue(textResponse('trop', 'text/plain', 429));
+    await expect(fetchText('https://example.com/')).rejects.toThrow(/HTTP 429 .*sans boucle/);
   });
 
   it('refuse un Content-Type binaire', async () => {

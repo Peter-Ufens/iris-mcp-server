@@ -66,4 +66,23 @@ describe('geocoding-v1', () => {
       expect.stringContaining('language=fr'),
     );
   });
+
+  it('ajoute countryCode si country_code fourni', async () => {
+    mockFetch.mockResolvedValue({
+      results: [
+        {
+          name: 'Saint-Louis',
+          latitude: 47.58,
+          longitude: 7.56,
+          country: 'France',
+          timezone: 'Europe/Paris',
+          country_code: 'FR',
+        },
+      ],
+    });
+    await tool.execute({ city: 'Saint-Louis', country_code: 'FR' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('countryCode=FR'),
+    );
+  });
 });

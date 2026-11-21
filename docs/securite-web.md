@@ -26,8 +26,8 @@ https / liste fixe / pas d'URL client.
 | Schema | `https` uniquement (`http`, `file`, `data`, `ftp`... refuses) |
 | Credentials | `https://user:pass@hote` refuse |
 | Hotes locaux | `localhost`, `*.localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan` |
-| IPv4 | `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16` (metadonnees cloud), `172.16/12`, `192.168/16`, `100.64/10`, `192.0.0/24`, `198.18/15`, multicast, reserve |
-| IPv6 | `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, formes IPv4 mappees / `::ffff:0:x`, NAT64 `64:ff9b::/96`, 6to4 `2002::/16`, site-local `fec0::/10`, discard `100::/64`, Teredo `2001:0::/32` |
+| IPv4 | `0.0.0.0/8`, `10/8`, `127/8`, `169.254/16` (metadonnees cloud), `172.16/12`, `192.168/16`, `100.64/10`, `192.0.0/24`, documentation (`192.0.2/24`, `198.51.100/24`, `203.0.113/24`), `198.18/15`, multicast, reserve |
+| IPv6 | `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, formes IPv4 mappees / `::ffff:0:x`, NAT64 `64:ff9b::/96` **juge l'IPv4 embarquee** (reseau avec DNS64 ; le reste de `64:ff9b::/32` est refuse ; adresse illisible = refusee), 6to4 `2002::/16`, site-local `fec0::/10`, discard `100::/64`, Teredo `2001:0::/32` |
 | DNS | Le nom est resolu avant l'appel : un nom public qui pointe vers une IP privee est refuse |
 | Redirections | Pas de suivi automatique. Max 3 sauts, chaque saut repasse la garde |
 | Content-Type | `text/*`, `application/json` (et `*+json`), `application/xml` (et `*+xml`), `application/xhtml+xml`. En-tete absent = traite comme du texte. Tout autre type declare : erreur |

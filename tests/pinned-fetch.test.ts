@@ -42,6 +42,47 @@ describe('D2 DNS rebinding : resolution epinglee a la connexion', () => {
     expect(r.err).toBeNull();
     expect(r.addr).toEqual([{ address: '93.184.216.34', family: 4 }]);
   });
+});
+
+// Review I1 (Gaby + Bob 14/11) : "IPv4 d'abord" ne fait que l'ordre, apres validation de TOUT.
+describe('I1 : preference IPv4 apres validation', () => {
+  const nat64Public = { address: '64:ff9b::c7e8:aa72', family: 6 };
+  const v4Public = { address: '151.101.2.114', family: 4 };
+  const resoudre = (liste: Array<{ address: string; family: number }>) =>
+    createPinnedLookup(vi.fn<Resolver>().mockResolvedValue(liste));
+
+  it('NAT64 public + A public, mode all : IPv4 d abord, NAT64 ensuite', async () => {
+    const r = await appel(resoudre([nat64Public, v4Public]), true);
+    expect(r.err).toBeNull();
+    expect(r.addr).toEqual([v4Public, nat64Public]);
+  });
+
+  it('meme cas, une seule adresse demandee : l IPv4', async () => {
+    const r = await appel(resoudre([nat64Public, v4Public]), false);
+    expect(r.err).toBeNull();
+    expect(r.addr).toBe(v4Public.address);
+  });
+
+  it('NAT64 seul (pas de A) : repli sur le NAT64', async () => {
+    const r = await appel(resoudre([nat64Public]), false);
+    expect(r.err).toBeNull();
+    expect(r.addr).toBe(nat64Public.address);
+  });
+
+  it.each([
+    ['A public + AAAA ::1', [v4Public, { address: '::1', family: 6 }]],
+    ['A prive + AAAA public', [{ address: '10.0.0.5', family: 4 }, nat64Public]],
+    ['NAT64 vers 10.0.0.5', [{ address: '64:ff9b::a00:5', family: 6 }]],
+    ['A public + NAT64 vers 10.0.0.5', [v4Public, { address: '64:ff9b::a00:5', family: 6 }]],
+    ['NAT64 hors /96', [{ address: '64:ff9b:1::808:808', family: 6 }]],
+    ['reponse vide', []],
+  ])('%s : tout l hote est refuse', async (_cas, liste) => {
+    const r = await appel(resoudre(liste as Array<{ address: string; family: number }>), true);
+    expect(r.err).toBeInstanceOf(UrlGuardError);
+  });
+});
+
+describe('D2 suite : integration', () => {
 
   it('integration undici : la socket n est jamais ouverte vers une IP privee', async () => {
     let hits = 0;

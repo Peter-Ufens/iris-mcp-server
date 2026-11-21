@@ -163,3 +163,92 @@ describe('fetch-url-v1 : plafond de taille', () => {
     expect(payload.truncated).toBe(false);
   });
 });
+
+describe('fetch-url-v1 : presse (rattrapage Gaby 15/11)', () => {
+  it('mur de connexion EBRA : acces_limite + paywall_suspect', async () => {
+    const html = "<html><body><h1>Titre</h1><div>Connectez-vous ou créez un compte</div><div>Se connecter ou créer un compte</div><div>S'abonner</div></body></html>";
+    mockFetch.mockResolvedValue(response(html, 'text/html; charset=utf-8'));
+    const p = payloadOf(await tool.execute({ url: 'https://www.dna.example/article' }));
+    expect(p.status).toBe(200);
+    expect(p.acces_limite).toBe('connexion_ou_abonnement');
+    expect(p.paywall_suspect).toBe(true);
+    expect(String(p.note_acces)).toMatch(/actu-rss-v1/);
+  });
+
+  // Review Bob 15/11 : cas mesure sur le NYT (en-tete de plus de 200 Ko, corps jamais lu)
+  it('page trop grosse, corps non atteint : acces_limite corps_non_atteint', async () => {
+    const tete = `<html><head><title>Titre - Journal</title></head><body><nav>Menu Rubriques</nav>`;
+    const enorme = `<div data-etat="${'x'.repeat(220_000)}"></div>`;
+    mockFetch.mockResolvedValue(
+      response(`${tete}${enorme}<article><p>CORPS JAMAIS LU</p></article></body></html>`, 'text/html; charset=utf-8'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/gros-article' }));
+    expect(p.truncated).toBe(true);
+    expect(String(p.text)).not.toContain('CORPS JAMAIS LU');
+    expect(p.acces_limite).toBe('corps_non_atteint');
+    expect(p.paywall_suspect).toBeUndefined();
+    expect(String(p.note_acces)).toMatch(/limite de lecture/);
+  });
+
+  it('page longue mais lisible (texte riche) : pas de corps_non_atteint', async () => {
+    const corps = `<p>${'Un vrai paragraphe d article avec du contenu. '.repeat(200)}</p>`;
+    mockFetch.mockResolvedValue(
+      response(`<html><body>${corps}<div data-etat="${'x'.repeat(220_000)}"></div></body></html>`, 'text/html'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/long' }));
+    expect(p.truncated).toBe(true);
+    expect(p.acces_limite).toBeUndefined();
+  });
+
+  it('page anti-robot (HTTP 200) : acces_limite challenge, pas paywall_suspect', async () => {
+    mockFetch.mockResolvedValue(
+      response('<html><body>Client Challenge A required part of this site couldn t load.</body></html>', 'text/html'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/article' }));
+    expect(p.acces_limite).toBe('challenge_anti_bot');
+    expect(p.paywall_suspect).toBeUndefined();
+  });
+
+  it('page normale : aucun drapeau', async () => {
+    mockFetch.mockResolvedValue(response('<html><body><p>Un vrai article.</p></body></html>', 'text/html'));
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/ok' }));
+    expect(p.acces_limite).toBeUndefined();
+    expect(p.paywall_suspect).toBeUndefined();
+  });
+
+  it('corps dans le JSON-LD : mis en tete, format json_ld', async () => {
+    const body = 'Phrase du corps de article. '.repeat(20);
+    const ld = JSON.stringify({ '@type': 'NewsArticle', headline: 'H', description: 'R', articleBody: body });
+    mockFetch.mockResolvedValue(
+      response(`<html><head><script type="application/ld+json">${ld}</script></head><body><div>Menu</div></body></html>`, 'text/html'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/spa' }));
+    expect(p.format).toBe('html_vers_texte+json_ld');
+    expect(String(p.text)).toMatch(/^\[Corps de l'article/);
+    expect(String(p.text)).toContain('Phrase du corps de article.');
+    expect((p.meta_article as { titre: string }).titre).toBe('H');
+  });
+  // Rattrapage Gaby 15/11 : menu LONG (CNA, France 3 : 3 000 a 6 000 car. de menus, 0 paragraphe)
+  it('page tronquee dont le texte est un long menu : corps_non_atteint aussi', async () => {
+    const menu = '<ul>' + Array.from({ length: 400 }, (_, i) => `<li>Rubrique ${i}</li>`).join('') + '</ul>';
+    const enorme = `<div data-etat="${'x'.repeat(220_000)}"></div>`;
+    mockFetch.mockResolvedValue(
+      response(`<html><body><nav>${menu}</nav>${enorme}<article><p>CORPS JAMAIS LU</p></article></body></html>`, 'text/html'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/long-menu' }));
+    expect(p.truncated).toBe(true);
+    expect(String(p.text).length).toBeGreaterThan(1_500);
+    expect(p.acces_limite).toBe('corps_non_atteint');
+  });
+
+  it('page tronquee avec de vrais paragraphes : pas de drapeau', async () => {
+    const para = '<p>' + 'Phrase du corps de l article avec assez de mots pour etre un vrai paragraphe. '.repeat(10) + '</p>';
+    const enorme = `<div data-etat="${'x'.repeat(220_000)}"></div>`;
+    mockFetch.mockResolvedValue(
+      response(`<html><body>${para}${para}${para}${enorme}</body></html>`, 'text/html'),
+    );
+    const p = payloadOf(await tool.execute({ url: 'https://presse.example/vrai-article' }));
+    expect(p.truncated).toBe(true);
+    expect(p.acces_limite).toBeUndefined();
+  });
+});

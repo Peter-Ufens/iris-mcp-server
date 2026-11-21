@@ -11,6 +11,7 @@ import {
   cleanQuery,
   parseReformulations,
   assessConfidence,
+  ollamaModelMatches,
   tool,
 } from '../src/tools/rag-search-v2.js';
 
@@ -87,18 +88,30 @@ interface Point {
 function stubServices(opts: {
   pointsFor: (body: any) => Point[];
   generate?: (body: any) => { ok: boolean; json?: unknown; abort?: boolean };
-  capture?: { generate?: any; searches: any[] };
+  /** Modeles presentes dans /api/ps (defaut : qwen charge pour ne pas casser les tests generate). */
+  psModels?: Array<{ name: string }> | 'absent';
+  capture?: { generate?: any; searches: any[]; generateCalls?: number };
 }) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: { body?: string; signal?: AbortSignal }) => {
       const body = init?.body ? JSON.parse(init.body) : {};
       const u = String(url);
+      if (u.endsWith('/api/ps')) {
+        if (opts.psModels === 'absent') {
+          return { ok: true, json: async () => ({ models: [] }) };
+        }
+        const models = opts.psModels ?? [{ name: 'qwen3.5:9b' }];
+        return { ok: true, json: async () => ({ models }) };
+      }
       if (u.endsWith('/api/embed')) {
         return { ok: true, json: async () => ({ embeddings: body.input.map(() => [0.1, 0.2, 0.3]) }) };
       }
       if (u.endsWith('/api/generate')) {
-        if (opts.capture) opts.capture.generate = body;
+        if (opts.capture) {
+          opts.capture.generate = body;
+          opts.capture.generateCalls = (opts.capture.generateCalls ?? 0) + 1;
+        }
         const g = opts.generate?.(body) ?? { ok: true, json: { response: '{"requetes":[]}' } };
         if (g.abort) {
           const err = new Error('aborted');
@@ -357,5 +370,25 @@ describe('rag-search-v2 / recherche', () => {
     const out = await tool.execute({ query: 'x' });
     const parsed = JSON.parse(out.content[0]!.text);
     expect(parsed.meta.tool).toBe('rag-search-v2');
+  });
+
+  it('R/Z3 : ollamaModelMatches accepte tag optionnel', () => {
+    expect(ollamaModelMatches('qwen3.5:9b', 'qwen3.5:9b')).toBe(true);
+    expect(ollamaModelMatches('qwen3.5:9b', 'qwen3.5')).toBe(true);
+    expect(ollamaModelMatches('nomic-embed-text:latest', 'qwen3.5:9b')).toBe(false);
+  });
+
+  it('R/Z3 : modele reformulation absent de /api/ps → pas d appel generate', async () => {
+    const capture = { searches: [] as any[], generateCalls: 0 };
+    stubServices({
+      psModels: 'absent',
+      capture,
+      pointsFor: () => [doc(0.9, '02-Projets\\Robot-Tondeuse.md', 'la tondeuse Robot-Tondeuse')],
+    });
+    const r = await ragSearch({ query: 'la tondeuse', patternsFile, glossaryFile });
+    expect(capture.generateCalls).toBe(0);
+    expect(r.meta.reformulationNote).toMatch(/non en memoire|non charge/i);
+    expect(r.meta.fallback?.used).toBe(true);
+    expect(r.meta.timingsMs?.reformulation).toBeLessThan(500);
   });
 });

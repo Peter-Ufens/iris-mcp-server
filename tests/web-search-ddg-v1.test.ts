@@ -142,6 +142,13 @@ describe('web-search-ddg-v1 : limites et erreurs', () => {
     expect(payload.error).toBeUndefined();
   });
 
+  it('liste vide : la note propose web-search-v2 en premier (review Bob 21/11)', async () => {
+    mockFetch.mockResolvedValue({ RelatedTopics: [], Results: [] });
+    const note = String(payloadOf(await tool.execute({ query: 'meteo Paris' })).note);
+    expect(note).toContain('web-search-v2');
+    expect(note.indexOf('web-search-v2')).toBeLessThan(note.indexOf('wikipedia-search-v1'));
+  });
+
   it('retourne une erreur propre si l API echoue', async () => {
     mockFetch.mockRejectedValue(new Error('HTTP 500 depuis https://api.duckduckgo.com/'));
     const payload = payloadOf(await tool.execute({ query: 'test' }));

@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { discoverTools, getRegisteredTools, getUptimeSeconds } from '../src/tools/_registry.js';
 
 describe('_registry', () => {
-  it('decouvre exactement 29 outils', async () => {
+  it('decouvre exactement 31 outils', async () => {
     const tools = await discoverTools();
-    expect(tools).toHaveLength(29);
+    expect(tools).toHaveLength(31);
   });
 
   it('chaque outil a un id, description, category, execute', async () => {
@@ -27,7 +27,7 @@ describe('_registry', () => {
   it('getRegisteredTools retourne les outils apres discover', async () => {
     await discoverTools();
     const tools = getRegisteredTools();
-    expect(tools.length).toBe(29);
+    expect(tools.length).toBe(31);
     expect(tools.map((t) => t.id)).toContain('iris-ping-v1');
   });
 
@@ -35,11 +35,12 @@ describe('_registry', () => {
     expect(getUptimeSeconds()).toBeGreaterThanOrEqual(0);
   });
 
-  it('contient les 29 outils attendus', async () => {
+  it('contient les 31 outils attendus (sans prises privees)', async () => {
     const tools = await discoverTools();
     const ids = tools.map((t) => t.id).sort();
     expect(ids).toEqual([
       'actu-rss-v1',
+      'connectivite-v1',
       'dictionary-v1',
       'exchange-rates-v1',
       'fetch-url-v1',
@@ -67,6 +68,7 @@ describe('_registry', () => {
       'translate-v1',
       'weather-v1',
       'web-search-ddg-v1',
+      'web-search-v2',
       'wikipedia-search-v1',
     ]);
   });

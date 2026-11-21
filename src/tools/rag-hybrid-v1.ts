@@ -12,6 +12,8 @@ import {
   sourceWeight,
   zonePatternsUnusable,
 } from './rag-query-v1.js';
+import { estPanneRag, postQdrant, resoudreBaseQdrant } from '../utils/rag-http.js';
+import { messageReseau } from '../utils/http-fetch.js';
 
 /**
  * rag-hybrid-v1 : recherche vectorielle + lexicale, pour les termes EXACTS.
@@ -38,6 +40,8 @@ const DEFAULT_COLLECTION = 'vault-text';
 const RRF_K = 60;
 const MAX_TOKENS = 6;
 const SCROLL_LIMIT = 256;
+/** Sonde du perimetre (project / sourceContains) : quelques passages suffisent pour savoir si le filtre serveur marche. */
+const SONDE_PERIMETRE = 16;
 /** au-dela, un terme est considere comme courant (le scroll est tronque) */
 const COMMON_DF = 60;
 const TYPO_MIN_LEN = 4;
@@ -115,27 +119,31 @@ export function transpositionVariants(token: string): string[] {
   return [...out];
 }
 
-async function postJson(url: string, body: unknown, timeoutMs: number): Promise<unknown> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    return await res.json();
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 interface LexPoint {
   sourceFile: string;
   source_filename: string;
   text: string;
+}
+
+export type Condition = { key: string; match: { text: string } };
+
+/**
+ * Review Gaby 21/11 : project / sourceContains vont AUSSI dans le filtre Qdrant (un groupe `must` par critere, en
+ * plusieurs casses). Sinon les 256 premiers passages (hors perimetre) remplissaient la page, le filtre local les jetait
+ * tous, et la note du projet demande n'etait jamais vue (un terme frequent donnait 0, meme en mode degrade).
+ * Le filtre local (keep) reste la garde finale.
+ *
+ * Review Bob 21/11 (du 0046) : le filtre texte de Qdrant respecte la casse, le filtre local non. `iris-mcp` ne donnait
+ * aucune des casses du chemin `Iris-MCP` (mesure reelle, Ollama coupe : 0 au lieu de 2). Le critere est donc decoupe
+ * en morceaux (`iris`, `mcp`), chacun cherche en plusieurs casses : le chemin `Iris-MCP` porte `Iris` ET `MCP`.
+ * Exporte pour les tests.
+ */
+export function groupesPerimetre(perimetre: string[]): Array<{ should: Condition[] }> {
+  return perimetre.flatMap((x) => {
+    const morceaux = x.split(/[^\p{L}\p{N}]+/u).filter((m) => m.length > 0);
+    const parties = morceaux.length > 1 ? morceaux : [x];
+    return parties.map((m) => ({ should: caseVariants(m).map((v) => ({ key: 'sourceFile', match: { text: v } })) }));
+  });
 }
 
 async function scrollVariants(
@@ -143,19 +151,54 @@ async function scrollVariants(
   collection: string,
   variants: string[],
   excludes: string[],
+  perimetre: string[] = [],
 ): Promise<LexPoint[]> {
   const should = variants.flatMap((v) => [
     { key: 'text', match: { text: v } },
     { key: 'sourceFile', match: { text: v } },
   ]);
-  const res = (await postJson(
-    `${qdrant}/collections/${encodeURIComponent(collection)}/points/scroll`,
+  return scrollFiltre(qdrant, collection, [{ should }, ...groupesPerimetre(perimetre)], excludes);
+}
+
+/**
+ * Passages qui portent TOUS les termes donnes (chaque terme dans une de ses casses), dans le texte ou le chemin.
+ * `cheminSeul` : seulement les fichiers dont le CHEMIN porte tous les termes (peu nombreux, tres pertinents).
+ * Sert au mode degrade (correction C1, Bob 20/11) : sans canal vectoriel, un mot tres frequent seul ne dit rien,
+ * mais plusieurs mots ensemble, ou un mot dans le nom du fichier, retrouvent la bonne note.
+ */
+async function scrollTousLesTermes(
+  qdrant: string,
+  collection: string,
+  termes: string[],
+  excludes: string[],
+  cheminSeul: boolean,
+  perimetre: string[] = [],
+): Promise<LexPoint[]> {
+  const dansPerimetre = groupesPerimetre(perimetre);
+  const must = termes.map((t) => ({
+    should: caseVariants(t).flatMap((v) =>
+      cheminSeul ? [{ key: 'sourceFile', match: { text: v } }] : [{ key: 'text', match: { text: v } }, { key: 'sourceFile', match: { text: v } }],
+    ),
+  }));
+  return scrollFiltre(qdrant, collection, [...must, ...dansPerimetre], excludes);
+}
+
+async function scrollFiltre(
+  qdrant: string,
+  collection: string,
+  must: Array<{ should: Condition[] }>,
+  excludes: string[],
+  limit: number = SCROLL_LIMIT,
+): Promise<LexPoint[]> {
+  const res = (await postQdrant(
+    qdrant,
+    `/collections/${encodeURIComponent(collection)}/points/scroll`,
     {
       filter: {
-        must: [{ should }],
+        must,
         ...(excludes.length ? { must_not: excludes.map((p) => ({ key: 'sourceFile', match: { text: p } })) } : {}),
       },
-      limit: SCROLL_LIMIT,
+      limit,
       with_payload: ['sourceFile', 'source_filename', 'text'],
       with_vector: false,
     },
@@ -244,7 +287,9 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   const includeZoneA = input.includeZoneA === true;
   const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
-  const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
+  // Base Qdrant en loopback par defaut ; une valeur refusee arrete l appel avant tout reseau (review Gaby 16/11).
+  const baseQ = resoudreBaseQdrant(process.env, input.qdrantUrl);
+  const qdrant = baseQ.ok ? baseQ.url : DEFAULT_QDRANT;
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
   const excludes = resolveExcludes(patterns, includeZoneA, includeReserved);
 
@@ -284,6 +329,11 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
     return result;
   }
 
+  if (!baseQ.ok) {
+    meta.error = [meta.error, baseQ.erreur].filter(Boolean).join(' · ');
+    return result;
+  }
+
   const tokens = extractTokens(input.query);
   meta.termes = tokens.map((t) => t.token);
 
@@ -308,19 +358,44 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
     if (input.sourceContains && !p.sourceFile.toLowerCase().includes(input.sourceContains.toLowerCase())) return false;
     return true;
   };
+  const perimetre = [input.project, input.sourceContains].filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+  // Review Bob 21/11 (du 0046) : si le perimetre envoye a Qdrant ne ramene rien (casse en « bosses » : `hyperv` pour
+  // `HyperV`), on refait UNE fois sans lui, comme avant le 0046. Le filtre local garde le perimetre : jamais pire qu'avant.
+  // Review Gaby 21/11 (du 0047) : le repli etait decide LECTURE PAR LECTURE. Un terme simplement absent du projet
+  // relisait donc tout sans filtre (256 passages pour rien) : 6 mots absents = 24 lectures, 3,4 s mesurees sur le vrai
+  // vault. On decide UNE fois, par une petite sonde (le perimetre seul) : s'il ramene au moins un passage qui passe le
+  // filtre local, on garde le filtre serveur partout ; sinon (casse en « bosses », projet inconnu) on lit sans lui.
+  // La sonde tourne EN PARALLELE des lectures filtrees (mesure reelle : ~300 ms par sonde, cout d un filtre texte sur le chemin).
+  // Sonde vide (casse en « bosses », projet inconnu) : on relit sans filtre serveur, le filtre local garde le perimetre.
+  let sondeOk: Promise<boolean> = Promise.resolve(true);
+  // Review Bob 21/11 (du 0048) : la sonde peut etre trompee. Les morceaux du projet (`iris`, `mcp`) ramenent aussi des
+  // chemins aux morceaux SEPARES (`Iris\MCP-1.md`), que le filtre local refuse ; si les 16 premiers sont de ce genre,
+  // la sonde dit « vide » et la note trouvee par la lecture filtree etait jetee. Donc : ce que la lecture filtree a
+  // trouve (et que le filtre local accepte) est toujours garde ; on ne relit sans filtre que si elle n'a rien.
+  // Jamais plus de lectures que le 0048 (souvent moins), et jamais moins de resultats que le 0047.
+  const avecRepli = async (lire: (p: string[]) => Promise<LexPoint[]>): Promise<LexPoint[]> => {
+    const [lu, ok] = await Promise.all([lire(perimetre), sondeOk]);
+    const garde = lu.filter(keep);
+    if (ok || garde.length > 0) return garde;
+    return (await lire([])).filter(keep);
+  };
   const reports: TokenReport[] = [];
   const docs = new Map<string, LexDoc>();
   let lexError: string | undefined;
   try {
+    if (perimetre.length > 0) {
+      sondeOk = scrollFiltre(qdrant, collection, groupesPerimetre(perimetre), excludes, SONDE_PERIMETRE).then((s) => s.filter(keep).length > 0);
+      sondeOk.catch(() => undefined);
+    }
     const exact = await Promise.all(
-      tokens.map((t) => scrollVariants(qdrant, collection, caseVariants(t.token), excludes).then((pts) => pts.filter(keep))),
+      tokens.map((t) => avecRepli((p) => scrollVariants(qdrant, collection, caseVariants(t.token), excludes, p))),
     );
     // faute de frappe : seulement pour un terme introuvable tel quel
     const typoRuns = await Promise.all(
       tokens.map((t, i) => {
         if (exact[i]!.length > 0 || t.priority < 1) return Promise.resolve([] as LexPoint[]);
         const vs = transpositionVariants(t.token);
-        return vs.length ? scrollVariants(qdrant, collection, vs, excludes).then((pts) => pts.filter(keep)) : Promise.resolve([]);
+        return vs.length ? avecRepli((p) => scrollVariants(qdrant, collection, vs, excludes, p)) : Promise.resolve([]);
       }),
     );
     tokens.forEach((t, i) => {
@@ -365,10 +440,67 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
       reports.push({ token: t.token, documents: perDoc.size, typo, variantesTrouvees: [...found].slice(0, 6), courant: false });
     });
   } catch (e) {
-    lexError = `canal lexical indisponible (${e instanceof Error ? e.message : String(e)})`;
+    lexError = `canal lexical indisponible (${messageReseau(e)})`;
+  }
+  const { r: vec, ms: msVec } = await vectorP;
+  // Review Gaby 16/11 : seulement si c est bien Ollama (ou sa base) qui manque. Une recherche Qdrant en erreur, une
+  // collection absente ou une base Qdrant refusee ne doivent pas etre annoncees comme une panne d Ollama.
+  const vecteurIndispo = vec.hits.length === 0 && /Ollama injoignable|OLLAMA_BASE_URL/.test(String(vec.meta.error ?? ''));
+
+  // Correction C1 (Bob 20/11, scenario CP1 rejoue) : sans canal vectoriel, un terme tres frequent du vault
+  // (« Iris », « MCP », plus de 256 passages) etait mis de cote comme « courant », et une question aussi simple que
+  // « Iris » restait sans reponse. En mode degrade SEULEMENT, on demande a Qdrant : d'abord les fichiers dont le
+  // chemin porte tous les termes, puis les passages qui les portent tous ; a defaut, les seuls termes courants.
+  let rattrapage: { termes: string[]; documents: number } | undefined;
+  const courants = reports.filter((r) => r.courant).map((r) => r.token);
+  if (vecteurIndispo && !lexError && courants.length > 0) {
+    try {
+      const tous = tokens.map((t) => t.token);
+      const essais = courants.length < tous.length ? [tous, courants] : [tous];
+      for (const termes of essais) {
+        const [parChemin, parTexte] = await Promise.all([
+          avecRepli((p) => scrollTousLesTermes(qdrant, collection, termes, excludes, true, p)),
+          avecRepli((p) => scrollTousLesTermes(qdrant, collection, termes, excludes, false, p)),
+        ]);
+        // Review Gaby 21/11 : un passage trouve par le chemin ET par le texte ne compte qu'une fois (sinon score gonfle).
+        const vus = new Set<string>();
+        const pts = [...parChemin, ...parTexte].filter(keep).filter((p) => {
+          const cle = `${p.sourceFile}\u0000${p.text}`;
+          if (vus.has(cle)) return false;
+          vus.add(cle);
+          return true;
+        });
+        if (pts.length === 0) continue;
+        const variants = termes.flatMap((t) => caseVariants(t));
+        const perDoc = new Map<string, LexPoint[]>();
+        for (const p of pts) {
+          const k = dedupKey(p.sourceFile, p.source_filename);
+          perDoc.set(k, [...(perDoc.get(k) ?? []), p]);
+        }
+        for (const [k, list] of perDoc) {
+          const inPath = list.some((p) => variants.some((v) => p.sourceFile.includes(v)));
+          const gain = termes.length * Math.log(1 + list.length) * (inPath ? 1.5 : 1);
+          const best = list.find((p) => variants.some((v) => p.text.includes(v))) ?? list[0]!;
+          const cur = docs.get(k);
+          if (!cur) {
+            docs.set(k, {
+              key: k, sourceFile: best.sourceFile, source_filename: best.source_filename, score: gain,
+              tokens: new Set(termes), typo: false, chemin: inPath, excerpt: excerptAround(best.text, variants),
+            });
+          } else {
+            cur.score += gain;
+            termes.forEach((t) => cur.tokens.add(t));
+            cur.chemin = cur.chemin || inPath;
+          }
+        }
+        rattrapage = { termes, documents: perDoc.size };
+        break;
+      }
+    } catch (e) {
+      lexError = `canal lexical indisponible (${messageReseau(e)})`;
+    }
   }
   const msLex = Date.now() - tLex;
-  const { r: vec, ms: msVec } = await vectorP;
 
   // --- fusion RRF
   // Le canal lexical ne compte plein pot que si la question porte un vrai identifiant (chiffre,
@@ -378,7 +510,10 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   // Une requete tres courte (1 ou 2 termes, ex. un nom de service) est une recherche de mot-cle : plein pot.
   // Sinon, en mode faible, un document ne compte cote lexical que s'il porte au moins deux termes
   // distinctifs : un seul mot rare (souvent un mot ecrit sans accent) ne suffit pas a le propulser.
-  const strong = tokens.length <= 2 || reports.some((r) => !r.courant && r.documents > 0 && (r.typo || tokens.find((t) => t.token === r.token)!.priority >= 2));
+  // Review Bob 16/11 (pre-test demande par Peter, Ollama coupe) : sans canal vectoriel, le lexical est le SEUL
+  // canal. Le brider (moitie de poids, 2 termes minimum) jetait des resultats utiles : 2 questions sur 5 seulement.
+  // (vecteurIndispo est calcule plus haut, juste apres le canal vectoriel.)
+  const strong = vecteurIndispo || tokens.length <= 2 || reports.some((r) => !r.courant && r.documents > 0 && (r.typo || tokens.find((t) => t.token === r.token)!.priority >= 2));
   const lexWeight = strong ? 1 : LEX_WEIGHT_WEAK;
   const minTokens = strong ? 1 : 2;
   const lexRanked = [...docs.values()]
@@ -427,6 +562,18 @@ export async function ragHybrid(input: RagHybridInput): Promise<RagHybridResult>
   } else if (docs.size === 0 && !lexError) {
     meta.conseil = "Aucun terme trouve tel quel ni avec une inversion de lettres : resultats vectoriels seulement. Verifier l'orthographe, ou le fichier n'est peut-etre pas encore indexe.";
   }
+  if (rattrapage) {
+    meta.rattrapageModeDegrade = {
+      ...rattrapage,
+      note: 'termes frequents cherches ensemble (chemin du fichier, puis meme passage)',
+    };
+  }
+  if (vecteurIndispo && !lexError) {
+    meta.modeDegrade = 'lexical_seul';
+    meta.conseil =
+      "Mode degrade : le canal vectoriel (Ollama) est indisponible, resultats par mot exact seulement. " +
+      'Une question en langage naturel peut rester sans reponse : reformuler avec des mots precis de la note cherchee.';
+  }
   const errors = [meta.error, vec.meta.error, lexError].filter(Boolean);
   if (errors.length) meta.error = errors.join(' | ');
   meta.timingsMs = { vectoriel: msVec, lexical: msLex, total: Date.now() - t0 };
@@ -460,7 +607,7 @@ export const tool: IrisTool = {
         includeZoneA: input.includeZoneA as boolean | undefined,
         includeReserved: input.includeReserved as boolean | undefined,
       });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }], ...(estPanneRag(result) ? { isError: true } : {}) };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return {
@@ -468,6 +615,7 @@ export const tool: IrisTool = {
           type: 'text' as const,
           text: JSON.stringify({ hits: [], meta: { tool: 'rag-hybrid-v1', filterZoneA: true, filterReserved: true, strictPrivateAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
         }],
+        isError: true,
       };
     }
   }),

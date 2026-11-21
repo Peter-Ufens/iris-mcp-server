@@ -6,7 +6,13 @@ vi.mock('../src/utils/http-fetch.js', () => ({
 }));
 
 import { fetchText } from '../src/utils/http-fetch.js';
-import { tool as actu } from '../src/tools/actu-rss-v1.js';
+import {
+  tool as actu,
+  googleWhenDays,
+  googleNewsUrl,
+  feedErrorCause,
+  errorText,
+} from '../src/tools/actu-rss-v1.js';
 
 const mockFetch = vi.mocked(fetchText);
 
@@ -636,5 +642,247 @@ describe('actu-rss-v1', () => {
       ),
     ).toBe(true);
     expect(payload.note).toMatch(/Voie C|officiel|service-public/i);
+  });
+
+  // --- I3 · F1–F5 (Gaby 05/11) ---
+
+  it('F1 : googleWhenDays suit since_hours (when:Nd)', () => {
+    expect(googleWhenDays(24)).toBe(1);
+    expect(googleWhenDays(48)).toBe(2);
+    expect(googleWhenDays(168)).toBe(7);
+    expect(googleWhenDays(1)).toBe(1);
+    expect(googleNewsUrl('greve', 168)).toContain('when%3A7d');
+    expect(googleNewsUrl('greve', 48)).toContain('when%3A2d');
+  });
+
+  it('F1 : recherche google avec since_hours=168 appelle when:7d', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('news.google.com')
+        ? okText(
+            url,
+            rss([
+              {
+                title: 'Greve - RMC',
+                link: 'https://news.google.com/rss/articles/X1',
+                extra: '<source url="https://rmc.bfmtv.com">RMC</source>',
+              },
+            ]),
+          )
+        : okText(url, SAMPLE_RSS),
+    );
+    await run({
+      zone: 'alsace',
+      query: 'greve',
+      recherche: 'google',
+      since_hours: 168,
+    });
+    const gUrl = mockFetch.mock.calls.map((c) => String(c[0])).find((u) =>
+      u.includes('news.google.com/rss/search'),
+    );
+    expect(gUrl).toBeTruthy();
+    expect(decodeURIComponent(gUrl!)).toMatch(/when:7d/);
+  });
+
+  it('F2+F4 : suffixe Google retire, doublon editeur gagne, citable:false sur decouverte', async () => {
+    const google = rss([
+      {
+        title: 'Greve des trams - DNA',
+        link: 'https://news.google.com/rss/articles/CBMiabc',
+        extra: '<source url="https://www.dna.fr">DNA</source>',
+      },
+    ]);
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('news.google.com')
+        ? okText(url, google)
+        : okText(
+            url,
+            rss([{ title: 'Greve des trams', link: 'https://www.dna.fr/greve' }]),
+          ),
+    );
+    const payload = await run({
+      zone: 'alsace',
+      query: 'greve',
+      google_news: true,
+      limit: 10,
+    });
+    expect(payload.items.some((i: { url: string }) => i.url.includes('dna.fr'))).toBe(
+      true,
+    );
+    // Doublon Google retire de decouverte (meme cle apres strip suffixe)
+    expect(
+      payload.decouverte.every(
+        (i: { title: string }) => !/greve des trams/i.test(i.title),
+      ),
+    ).toBe(true);
+  });
+
+  it('F4 : item Google seul porte citable:false', async () => {
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('news.google.com')
+        ? okText(
+            url,
+            rss([
+              {
+                title: 'Seul Google - RMC',
+                link: 'https://news.google.com/rss/articles/X9',
+                extra: '<source url="https://rmc.bfmtv.com">RMC</source>',
+              },
+            ]),
+          )
+        : okText(url, rss([])),
+    );
+    const payload = await run({
+      zone: 'alsace',
+      query: 'seul',
+      recherche: 'google',
+      limit: 5,
+    });
+    expect(payload.decouverte.length).toBeGreaterThanOrEqual(1);
+    expect(payload.decouverte[0].citable).toBe(false);
+  });
+
+  it('F5 : en cas de doublon, date editeur gagne sur date_approx Bing', async () => {
+    const editorPub = new Date().toUTCString();
+    const bingClick =
+      'http://www.bing.com/news/apiclick?articleid=1&url=https%3A%2F%2Fwww.dna.fr%2Fmeme&from=RSS';
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes('bing.com')) {
+        return okText(
+          url,
+          rss([
+            {
+              title: 'Meme sujet',
+              link: bingClick,
+              pub: 'Mon, 01 Jan 2024 00:00:00 GMT',
+              extra: '<News:Source>DNA</News:Source>',
+            },
+          ]),
+        );
+      }
+      return okText(
+        url,
+        rss([{ title: 'Meme sujet', link: 'https://www.dna.fr/meme', pub: editorPub }]),
+      );
+    });
+    const payload = await run({
+      zone: 'alsace',
+      query: 'meme',
+      recherche: 'bing',
+      limit: 10,
+    });
+    const hit = payload.items.find((i: { url: string }) =>
+      i.url.includes('dna.fr/meme'),
+    );
+    expect(hit).toBeTruthy();
+    expect(hit.date_approx).toBeUndefined();
+  });
+
+  it('feeds[] : cause dns_nat64 / http_403 / delai', async () => {
+    expect(feedErrorCause('NAT64 64:ff9b blocked')).toBe('dns_nat64');
+    expect(feedErrorCause('HTTP 403 Forbidden')).toBe('http_403');
+    expect(feedErrorCause('Timeout after 8s')).toBe('delai');
+    mockFetch.mockRejectedValue(new Error('HTTP 403 le site refuse'));
+    const payload = await run({ zone: 'alsace' });
+    expect(payload.error).toBeTruthy();
+    expect(
+      payload.feeds.every(
+        (f: { status: string; cause?: string }) =>
+          f.status !== 'erreur' || f.cause === 'http_403',
+      ),
+    ).toBe(true);
+  });
+
+  // Review Bob 14/11 soir : vrais messages d'Iris, et chiffres d'URL qui trompaient l'ancien classement
+  it.each([
+    ['HTTP 404 depuis https://www.lemonde.fr/article/403/x.html', 'http_4xx'],
+    ['HTTP 500 depuis https://exemple.fr/2026/11/429-items', 'http_5xx'],
+    ['HTTP 403 depuis https://www.legifrance.gouv.fr/ : le site refuse les lecteurs automatiques.', 'http_403'],
+    ['HTTP 429 depuis https://exemple.fr/ : le site demande de ralentir.', 'http_429'],
+    ['Hote refuse : "x.fr" resout vers une adresse privee ou reservee (64:ff9b::a00:5).', 'dns_nat64'],
+    ['Hote refuse : "x.fr" resout vers une adresse privee ou reservee (10.0.0.5).', 'refus_securite'],
+    ['fetch failed (Hote refuse a la connexion : "x.fr" ... (protection DNS rebinding).)', 'refus_securite'],
+    ['Resolution DNS impossible pour "x.invalid" : getaddrinfo ENOTFOUND x.invalid', 'dns'],
+    ['The operation was aborted due to timeout', 'delai'],
+    ['fetch failed (ECONNRESET read ECONNRESET)', 'reseau'],
+    ['Trop de redirections (max 3) depuis https://exemple.fr/', 'autre'],
+  ])('feedErrorCause("%s") = %s', (message, attendu) => {
+    expect(feedErrorCause(message)).toBe(attendu);
+  });
+
+  it('errorText garde la cause cachee par undici (« fetch failed »)', () => {
+    const cause = Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' });
+    expect(errorText(new Error('fetch failed', { cause }))).toBe('fetch failed (ECONNRESET read ECONNRESET)');
+    expect(errorText(new Error('simple'))).toBe('simple');
+    expect(errorText('texte')).toBe('texte');
+  });
+  // --- Rattrapage Gaby 14/11 : le doublon editeur doit gagner meme si l'autre copie est plus recente ---
+
+  it('doublon : editeur garde meme si la copie Bing est plus recente (date_approx)', async () => {
+    const editorPub = new Date(Date.now() - 60 * 60_000).toUTCString();
+    const bingPub = new Date(Date.now() - 10 * 60_000).toUTCString();
+    const bingClick =
+      'http://www.bing.com/news/apiclick?articleid=2&url=https%3A%2F%2Fwww.dna.fr%2Fmeme2&from=RSS';
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('bing.com')
+        ? okText(
+            url,
+            rss([
+              {
+                title: 'Meme sujet recent',
+                link: bingClick,
+                pub: bingPub,
+                extra: '<News:Source>DNA</News:Source>',
+              },
+            ]),
+          )
+        : okText(
+            url,
+            rss([{ title: 'Meme sujet recent', link: 'https://www.dna.fr/meme2', pub: editorPub }]),
+          ),
+    );
+    const payload = await run({ zone: 'alsace', query: 'meme', recherche: 'bing', limit: 10 });
+    const hits = payload.items.filter((i: { title: string }) => i.title === 'Meme sujet recent');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].date_approx).toBeUndefined();
+    expect(hits[0].published_at).toBe(new Date(editorPub).toISOString());
+  });
+
+  it('doublon : editeur garde meme si la copie Google est plus recente (decouverte)', async () => {
+    const editorPub = new Date(Date.now() - 90 * 60_000).toUTCString();
+    const googlePub = new Date(Date.now() - 5 * 60_000).toUTCString();
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes('news.google.com')
+        ? okText(
+            url,
+            rss([
+              {
+                title: 'Sujet commun - DNA',
+                link: 'https://news.google.com/rss/articles/Z1',
+                pub: googlePub,
+                extra: '<source url="https://www.dna.fr">DNA</source>',
+              },
+            ]),
+          )
+        : okText(url, rss([{ title: 'Sujet commun', link: 'https://www.dna.fr/commun', pub: editorPub }])),
+    );
+    const payload = await run({ zone: 'alsace', query: 'commun', recherche: 'google', limit: 10 });
+    expect(payload.items.some((i: { url: string }) => i.url.includes('dna.fr/commun'))).toBe(true);
+    expect(payload.decouverte.some((i: { title: string }) => /sujet commun/i.test(i.title))).toBe(false);
+  });
+
+  it('deux titres differents avec " - " ne sont pas fusionnes (pas de faux doublon)', async () => {
+    mockFetch.mockResolvedValue(
+      okText(
+        'https://www.dna.fr/rss',
+        rss([
+          { title: 'Trump - Xi : visite a Pekin', link: 'https://www.dna.fr/a1' },
+          { title: 'Trump - Poutine : sommet', link: 'https://www.dna.fr/a2' },
+        ]),
+      ),
+    );
+    const payload = await run({ zone: 'alsace', limit: 10 });
+    const titles = payload.items.map((i: { title: string }) => i.title);
+    expect(titles).toContain('Trump - Xi : visite a Pekin');
+    expect(titles).toContain('Trump - Poutine : sommet');
   });
 });

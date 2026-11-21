@@ -1,21 +1,23 @@
-# Catalogue des outils MCP - iris-mcp-server v0.12.0
+# Catalogue des outils MCP - iris-mcp-server v0.13.0
 
-29 outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
-Chaque outil a un ID unique versionne (`<nom>-v<version>`).
+**31** outils operationnels avec auto-decouverte (`src/tools/_registry.ts`).  
+Chaque outil a un ID unique versionne (`<nom>-v<version>`).  
+(Les prises ecran / workflows restent hors de cette vitrine publique.)
 
-## iris (2)
+## iris (3)
 
 | ID | Fichier | Description |
 |---|---|---|
 | `iris-ping-v1` | `iris-ping-v1.ts` | Healthcheck : version, uptime, liste des outils, timestamp |
 | `time-v1` | `time-v1.ts` | Heure / date / jour de semaine par fuseau (`Intl`, calcul local serveur, pas d'API externe) |
+| `connectivite-v1` | `connectivite-v1.ts` | Mesure de debit reseau (sonde 1 Mio) : OK / SLOW / DOWN, cache court |
 
 ## ollama (2)
 
 | ID | Fichier | Description |
 |---|---|---|
-| `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`) |
-| `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat`) |
+| `ollama-list-v1` | `ollama-list-v1.ts` | Liste les modeles Ollama (`GET /api/tags`), avec la version (`/api/version`) et les modeles charges en memoire (`/api/ps`) |
+| `ollama-chat-v1` | `ollama-chat-v1.ts` | Chat avec un modele Ollama (`POST /api/chat` ; repli sur le format OpenAI `/v1/chat/completions` si l API native repond 404, 405 ou 501) |
 
 ## memory (4)
 
@@ -172,15 +174,16 @@ Sans cle API perso sauf NASA (DEMO_KEY integree).
 | `random-fact-v1` | `random-fact-v1.ts` | uselessfacts.jsph.pl |
 | `nasa-apod-v1` | `nasa-apod-v1.ts` | NASA APOD (DEMO_KEY) |
 
-## web (4)
+## web (5)
 
-Ajoutes en v0.5.0 (+ `actu-rss-v1` en v0.10.0). Sans cle API. Regles reseau : [securite-web.md](securite-web.md)
+Ajoutes en v0.5.0 (+ `actu-rss-v1` en v0.10.0, `web-search-v2` ensuite). Sans cle API obligatoire. Regles reseau : [securite-web.md](securite-web.md)
 (https only, hotes locaux et IP privees refuses, plafonds, redirections limitees).
 `actu-rss-v1` : **aucune URL client** (liste de flux fixe dans le code · ADR-0006 hub).
 
 | ID | Fichier | API / source |
 |---|---|---|
 | `fetch-url-v1` | `fetch-url-v1.ts` | GET https direct, garde SSRF, texte plafonne (HTML converti en texte) |
+| `web-search-v2` | `web-search-v2.ts` | Recherche web : SearXNG local (reveil optionnel) puis repli DDG ; Brave optionnel |
 | `web-search-ddg-v1` | `web-search-ddg-v1.ts` | DuckDuckGo Instant Answer (api.duckduckgo.com) |
 | `wikipedia-search-v1` | `wikipedia-search-v1.ts` | API MediaWiki (`<lang>.wikipedia.org`) |
 | `actu-rss-v1` | `actu-rss-v1.ts` | Flux RSS/Atom fixes (FR/Alsace/IA + La 1ere Guadeloupe + BBC/NYT USA + TechCrunch/Verge/CNA/Japan Times, zone `asie_ia` filtree IA et Asie + zone `officiel` service-public voie C) + recherche `recherche=bing|google|les_deux` (Bing → items editeur ; Google → decouverte) |

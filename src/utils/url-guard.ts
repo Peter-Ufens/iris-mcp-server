@@ -45,6 +45,9 @@ export function isBlockedIpv4(address: string): boolean {
   if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
   if (a === 192 && b === 168) return true; // 192.168.0.0/16
   if (a === 192 && b === 0 && c === 0) return true; // 192.0.0.0/24
+  if (a === 192 && b === 0 && c === 2) return true; // 192.0.2.0/24 (documentation)
+  if (a === 198 && b === 51 && c === 100) return true; // 198.51.100.0/24 (documentation)
+  if (a === 203 && b === 0 && c === 113) return true; // 203.0.113.0/24 (documentation)
   if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 (bench)
   if (a >= 224) return true; // multicast 224/4 + reserve 240/4 + broadcast
   return false;
@@ -99,7 +102,8 @@ export function isBlockedIpv6(address: string): boolean {
   if (embedded && isBlockedIpv4(embedded[1]!)) return true;
 
   const parts = expandIpv6(h);
-  if (!parts) return false;
+  // Review I1 (Gaby + Bob 14/11) : ce qui ne se lit pas est refuse (fail-closed).
+  if (!parts) return true;
 
   if (parts.every((p) => p === 0)) return true; // ::
   if (parts.slice(0, 7).every((p) => p === 0) && parts[7] === 1) return true; // ::1
@@ -119,8 +123,18 @@ export function isBlockedIpv6(address: string): boolean {
   if ((high & 0xfe) === 0xfc) return true; // ULA fc00::/7
   if (high === 0xfe && (low & 0xc0) === 0x80) return true; // link-local fe80::/10
 
-  // F7 Gaby 22/10 (+ micro-lot review) : formes encore acceptees a tort.
-  if (parts[0] === 0x64 && parts[1] === 0xff9b) return true; // NAT64 64:ff9b::/96
+  // F7-reseau Gaby 22/10 · I1 14/11 : NAT64 64:ff9b::/96 = juger l'IPv4 embarquee
+  // (box avec DNS64), pas refuser le prefixe entier. 64:ff9b::7f00:1 reste bloque.
+  if (parts[0] === 0x64 && parts[1] === 0xff9b) {
+    // /96 bien connu seulement (RFC 6052 : hextets 2 a 5 nuls). Le reste de 64:ff9b::/32
+    // (dont le prefixe local 64:ff9b:1::/48) range l'IPv4 ailleurs : refuse (review I1).
+    if (parts[2] !== 0 || parts[3] !== 0 || parts[4] !== 0 || parts[5] !== 0) return true;
+    const a = (parts[6]! >> 8) & 0xff;
+    const b = parts[6]! & 0xff;
+    const c = (parts[7]! >> 8) & 0xff;
+    const d = parts[7]! & 0xff;
+    return isBlockedIpv4(`${a}.${b}.${c}.${d}`);
+  }
   if (parts[0] === 0x2002) return true; // 6to4 2002::/16 (souvent IPv4 embarquee)
   // site-local deprecate fec0::/10 (pas seulement /16)
   if ((parts[0]! & 0xffc0) === 0xfec0) return true;

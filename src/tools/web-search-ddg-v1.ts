@@ -105,8 +105,8 @@ export const tool: IrisTool = {
   id: 'web-search-ddg-v1',
   description:
     'Recherche web via l API Instant Answer de DuckDuckGo (gratuite, sans cle). ' +
-    'Retourne resume, resultats officiels et sujets lies. Ce n est pas un index web complet : ' +
-    'sur une requete pointue la liste peut etre vide (utiliser wikipedia-search-v1 ou fetch-url-v1).',
+    'Ce n est pas un index web complet : liste souvent vide. Preferer web-search-v2 (ADR-0011 : Brave/SearXNG/repli) ' +
+    'ou actu-rss-v1 recherche=bing / wikipedia-search-v1 / fetch-url-v1.',
   category: 'web',
   inputSchema: {
     query: z.string().min(1).max(200).describe('Termes de recherche (1 a 200 caracteres)'),
@@ -143,8 +143,9 @@ export const tool: IrisTool = {
           ? {
               note:
                 'Aucune reponse instantanee DuckDuckGo pour cette requete. ' +
-                'L API Instant Answer ne couvre pas tout le web : essayer wikipedia-search-v1, ' +
-                'reformuler avec un terme plus general, ou lire une URL connue avec fetch-url-v1.',
+                // Review Bob 21/11 (question de Peter) : la vraie recherche web d'Iris est web-search-v2 ; la citer en premier.
+                'L API Instant Answer ne couvre pas tout le web (noms connus seulement) : essayer d abord web-search-v2 ' +
+                '(recherche web complete), puis wikipedia-search-v1, ou lire une URL connue avec fetch-url-v1.',
             }
           : {}),
       });

@@ -13,6 +13,9 @@ import {
   sourceWeight,
   zonePatternsUnusable,
 } from './rag-query-v1.js';
+import { embedLocal, ollamaEstKo, type MoteurEmbed } from '../utils/local-embeddings.js';
+import { causeErreurQdrant, estPanneRag, postOllama, postQdrant, resoudreBaseOllama, resoudreBaseQdrant } from '../utils/rag-http.js';
+import { lireJsonBorne } from '../utils/http-fetch.js';
 
 /**
  * rag-search-v2 : recherche du vault qui comprend le vocabulaire de l'utilisateur.
@@ -296,42 +299,70 @@ export function cleanQuery(query: string, tics: string[]): string {
 // Appels HTTP
 // ---------------------------------------------------------------------------
 
-async function postJson(url: string, body: unknown, timeoutMs: number): Promise<unknown> {
+/** Compare noms Ollama (tag optionnel) : `qwen3.5:9b` ≈ `qwen3.5:9b` / `qwen3.5`. */
+export function ollamaModelMatches(loaded: string, wanted: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const a = norm(loaded);
+  const b = norm(wanted);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const base = (s: string) => s.split(':')[0]!;
+  return base(a) === base(b) && (a.startsWith(b) || b.startsWith(a));
+}
+
+/**
+ * Lot R (Z3) : si le modele de reformulation n'est pas deja en memoire Ollama,
+ * on saute la reformulation (sinon ~6 s de timeout pendant que Hermes tient le GPU).
+ * `null` = /api/ps injoignable → on tente quand meme generate.
+ */
+export async function isOllamaModelLoaded(
+  ollama: string,
+  model: string,
+  timeoutMs = 2_000,
+): Promise<boolean | null> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const res = await fetch(`${ollama.replace(/\/+$/, '')}/api/ps`, {
       signal: controller.signal,
+      redirect: 'error',
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    return await res.json();
+    if (!res.ok) return null;
+    const j = await lireJsonBorne<{ models?: Array<{ name?: string; model?: string }> }>(res, 1_000_000, 'Ollama');
+    const models = j.models ?? [];
+    return models.some((m) => ollamaModelMatches(String(m.name ?? m.model ?? ''), model));
+  } catch {
+    return null;
   } finally {
     clearTimeout(t);
   }
 }
 
-async function embedAll(ollama: string, model: string, texts: string[]): Promise<number[][]> {
-  try {
-    const res = (await postJson(`${ollama}/api/embed`, { model, input: texts }, 30_000)) as {
-      embeddings?: number[][];
-    };
-    if (Array.isArray(res.embeddings) && res.embeddings.length === texts.length) return res.embeddings;
-    throw new Error('reponse /api/embed incomplete');
-  } catch {
-    // Ollama ancien : un appel par texte sur l'API historique.
-    const out: number[][] = [];
-    for (const prompt of texts) {
-      const r = (await postJson(`${ollama}/api/embeddings`, { model, prompt }, 30_000)) as { embedding?: number[] };
-      if (!r.embedding?.length) throw new Error('reponse sans embedding');
-      out.push(r.embedding);
+async function embedAll(ollama: string, model: string, texts: string[]): Promise<{ vecteurs: number[][]; moteurs: MoteurEmbed[] }> {
+  // Lot O : Ollama puis Hermes :18434 (embedLocal). Batch Ollama /api/embed d'abord si Ollama n'est pas repute KO.
+  if (!ollamaEstKo()) {
+    try {
+      const res = (await postOllama(ollama, '/api/embed', { model, input: texts }, 10_000)) as { embeddings?: unknown };
+      const e = res.embeddings;
+      // Review Gaby : chaque vecteur doit etre fait de nombres finis (le simple compte ne suffisait pas).
+      const sain = (v: unknown) => Array.isArray(v) && v.length > 0 && v.length <= 8192 && v.every((x) => typeof x === 'number' && Number.isFinite(x));
+      if (Array.isArray(e) && e.length === texts.length && e.every(sain)) {
+        return { vecteurs: e as number[][], moteurs: ['ollama'] };
+      }
+    } catch {
+      // tombe sur embedLocal un par un
     }
-    return out;
   }
+  const vecteurs: number[][] = [];
+  const moteurs: MoteurEmbed[] = [];
+  for (const prompt of texts) {
+    const r = await embedLocal(prompt, { model, timeoutMs: 10_000, ollamaBase: ollama, outil: 'rag-search-v2' });
+    if (!r.ok) throw new Error(r.erreur);
+    vecteurs.push(r.vector);
+    if (!moteurs.includes(r.moteur)) moteurs.push(r.moteur);
+  }
+  return { vecteurs, moteurs };
 }
-
 export function buildReformulationPrompt(query: string, matches: GlossaryMatch[], glossary: Glossary): string {
   const lines = matches.map((m) => {
     const where = m.entry.where.length ? ` (notes : ${m.entry.where.slice(0, 2).join(', ')})` : '';
@@ -419,8 +450,9 @@ async function searchVariant(
     // les chemins du glossaire s'ecrivent avec « / », l'index stocke des chemins Windows
     filter.must = [{ key: 'sourceFile', match: { text: variant.pinnedPath.replace(/\//g, '\\') } }];
   }
-  const res = (await postJson(
-    `${qdrant}/collections/${encodeURIComponent(collection)}/points/search`,
+  const res = (await postQdrant(
+    qdrant,
+    `/collections/${encodeURIComponent(collection)}/points/search`,
     { vector, limit: variant.pinnedPath ? 6 : Math.max(limit * 8, 40), with_payload: true, filter },
     60_000,
   )) as { result?: Array<{ score?: number; payload?: Record<string, unknown> }> };
@@ -626,8 +658,11 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   const includeZoneA = input.includeZoneA === true;
   const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
-  const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
-  const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
+  // Bases en loopback par defaut ; une valeur refusee arrete l appel avant tout reseau (review Gaby 16/11).
+  const baseQ = resoudreBaseQdrant(process.env, input.qdrantUrl);
+  const baseO = resoudreBaseOllama(process.env, input.ollamaUrl);
+  const qdrant = baseQ.ok ? baseQ.url : DEFAULT_QDRANT;
+  const ollama = baseO.ok ? baseO.url : DEFAULT_OLLAMA;
   const embedModel = process.env.RAG_EMBED_MODEL ?? DEFAULT_EMBED_MODEL;
   const genModel = process.env.RAG_REFORMULATE_MODEL ?? DEFAULT_REFORMULATE_MODEL;
   const genTimeout = Number(process.env.RAG_REFORMULATE_TIMEOUT_MS) || DEFAULT_REFORMULATE_TIMEOUT_MS;
@@ -685,6 +720,12 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
     return result;
   }
 
+  const refusBase = [baseQ.ok ? '' : baseQ.erreur, baseO.ok ? '' : baseO.erreur].filter(Boolean);
+  if (refusBase.length > 0) {
+    meta.error = [meta.error, ...refusBase].filter(Boolean).join(' · ');
+    return result;
+  }
+
   // 1) variantes deterministes
   const cleaned = cleanQuery(input.query, glossary.tics);
   const allMatches = matchGlossary(cleaned, glossary);
@@ -713,34 +754,47 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   } else if (!glossary.entries.length) {
     meta.reformulationNote = `0 reformulation : ${glossary.error ?? 'glossaire vide'}. Recherche sans traduction du vocabulaire.`;
   } else {
-    try {
-      const gen = (await postJson(
-        `${ollama}/api/generate`,
-        {
-          model: genModel,
-          prompt: buildReformulationPrompt(cleaned, matches, glossary),
-          stream: false,
-          think: false,
-          format: 'json',
-          keep_alive: '30m',
-          options: { temperature: 0, num_predict: 300 },
-        },
-        genTimeout,
-      )) as { response?: string };
-      const refs = parseReformulations(String(gen.response ?? ''), cleaned);
-      meta.reformulations = refs;
-      meta.reformulationCount = refs.length;
-      refs.forEach((r, i) => variants.push({ label: `reformulation ${i + 1}`, text: r, weight: 0.8 }));
-      meta.reformulationNote = refs.length
-        ? `${refs.length} reformulation(s) par ${genModel}.`
-        : `0 reformulation : ${genModel} a repondu sans requete exploitable (reponse vide ou JSON invalide). Recherche faite sans reformulation.`;
-    } catch (e) {
-      const aborted = e instanceof Error && e.name === 'AbortError';
-      const reason = aborted
-        ? `reformulation au-dela de ${genTimeout} ms (modele ${genModel} froid ou GPU occupe)`
-        : `reformulation impossible (${e instanceof Error ? e.message : String(e)})`;
-      meta.fallback = { used: true, reason };
-      meta.reformulationNote = `0 reformulation : ${reason}. Repli sur la question et le glossaire.`;
+    // R / Z3 : ne pas attendre 6 s si qwen n'est pas charge (Hermes / GPU occupe)
+    const loaded = await isOllamaModelLoaded(ollama, genModel);
+    if (loaded === false) {
+      meta.fallback = {
+        used: true,
+        reason: `modele ${genModel} non charge dans Ollama (GPU probablement pris ou modele froid)`,
+      };
+      meta.reformulationNote =
+        `0 reformulation : ${genModel} non en memoire. Repli glossaire. ` +
+        `Charger le modele ou reformulate=false (deja le plus rapide).`;
+    } else {
+      try {
+        const gen = (await postOllama(
+          ollama,
+          '/api/generate',
+          {
+            model: genModel,
+            prompt: buildReformulationPrompt(cleaned, matches, glossary),
+            stream: false,
+            think: false,
+            format: 'json',
+            keep_alive: '30m',
+            options: { temperature: 0, num_predict: 300 },
+          },
+          genTimeout,
+        )) as { response?: string };
+        const refs = parseReformulations(String(gen.response ?? ''), cleaned);
+        meta.reformulations = refs;
+        meta.reformulationCount = refs.length;
+        refs.forEach((r, i) => variants.push({ label: `reformulation ${i + 1}`, text: r, weight: 0.8 }));
+        meta.reformulationNote = refs.length
+          ? `${refs.length} reformulation(s) par ${genModel}.`
+          : `0 reformulation : ${genModel} a repondu sans requete exploitable (reponse vide ou JSON invalide). Recherche faite sans reformulation.`;
+      } catch (e) {
+        const aborted = e instanceof Error && e.name === 'AbortError';
+        const reason = aborted
+          ? `reformulation au-dela de ${genTimeout} ms (modele ${genModel} froid ou GPU occupe)`
+          : `reformulation impossible (${e instanceof Error ? e.message : String(e)})`;
+        meta.fallback = { used: true, reason };
+        meta.reformulationNote = `0 reformulation : ${reason}. Repli sur la question et le glossaire.`;
+      }
     }
   }
   const msGen = Date.now() - tGen;
@@ -749,7 +803,10 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   const tSearch = Date.now();
   let vectors: number[][];
   try {
-    vectors = await embedAll(ollama, embedModel, variants.map((v) => v.text));
+    const emb = await embedAll(ollama, embedModel, variants.map((v) => v.text));
+    vectors = emb.vecteurs;
+    meta.moteurEmbed = emb.moteurs.join(' + ');
+    if (emb.moteurs.some((m) => m !== 'ollama')) meta.embedRepli = 'Ollama indisponible : embeddings par le moteur de secours verifie (Hermes).';
   } catch (e) {
     meta.error = [meta.error, `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
     return result;
@@ -779,7 +836,7 @@ export async function ragSearch(input: RagSearchInput): Promise<RagSearchResult>
   try {
     runs = await Promise.all(jobs);
   } catch (e) {
-    meta.error = [meta.error, `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
+    meta.error = [meta.error, await causeErreurQdrant(e, qdrant, collection, vectors[0]?.length)].filter(Boolean).join(' · ');
     return result;
   }
   const msSearch = Date.now() - tSearch;
@@ -833,7 +890,12 @@ export const tool: IrisTool = {
     sourceContains: z.string().optional().describe("Ne garder que les chemins contenant ce texte, ex. 'from-microsoft-copilot'"),
     includeZoneA: z.boolean().optional().describe('Ouvre les conversations brutes Zone A-1 (defaut false). N ouvre jamais la zone personnelle stricte A-2 ni la zone reservee.'),
     includeReserved: z.boolean().optional().describe("Ouvre la zone reservee seulement si l'utilisateur le demande ET IRIS_ALLOW_RESERVED=1 (defaut false). N ouvre jamais A-2."),
-    reformulate: z.boolean().optional().describe('Reformulations par le modele local (defaut true). false = plus rapide.'),
+    reformulate: z
+      .boolean()
+      .optional()
+      .describe(
+        'Reformulations par le modele local (defaut true). false = plus rapide. Si le modele n est pas deja charge dans Ollama, Iris saute la reformulation tout seul : il ne charge jamais ce modele lui-meme (pas de 20 s d attente ni de place prise sur le GPU).',
+      ),
   },
   // journal des recherches : opt-in par IRIS_RAG_JOURNAL_DIR, sans effet sinon
   execute: avecJournal('rag-search-v2', async (input) => {
@@ -847,7 +909,7 @@ export const tool: IrisTool = {
         includeReserved: input.includeReserved as boolean | undefined,
         reformulate: input.reformulate as boolean | undefined,
       });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }], ...(estPanneRag(result) ? { isError: true } : {}) };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return {
@@ -855,6 +917,7 @@ export const tool: IrisTool = {
           type: 'text' as const,
           text: JSON.stringify({ hits: [], meta: { tool: 'rag-search-v2', filterZoneA: true, filterReserved: true, strictPrivateAlwaysFiltered: true, count: 0, error: msg } }, null, 2),
         }],
+        isError: true,
       };
     }
   }),

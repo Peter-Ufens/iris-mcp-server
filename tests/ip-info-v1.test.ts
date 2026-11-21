@@ -29,6 +29,13 @@ describe('ip-info-v1', () => {
     const payload = JSON.parse(result.content[0]!.text);
     expect(payload.ip).toBe('8.8.8.8');
     expect(payload.country).toBe('United States');
+    // Review C1 (Gaby + Bob 14/11) : la description annonce ce champ, la sortie le porte.
+    expect(payload.precision).toBe('approximative');
+  });
+
+  it('la description ne cite aucune ville d utilisateur et interdit ip-info vers weather', () => {
+    expect(tool.description).toMatch(/PAS le domicile/);
+    expect(tool.description).toMatch(/weather-v1/);
   });
 
   it('retourne une erreur si status fail', async () => {

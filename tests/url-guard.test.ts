@@ -101,14 +101,61 @@ describe('url-guard : hotes locaux et prives', () => {
     expect(isBlockedIpv6('2001:4860:4860::8888')).toBe(false);
   });
 
-  it('isBlockedIpv6 : NAT64 / 6to4 / fec0 / 100:: / ::ffff:0:x (F7)', () => {
-    expect(isBlockedIpv6('64:ff9b::7f00:1')).toBe(true);
+  it('isBlockedIpv6 : NAT64 juge IPv4 embarquee (I1) / 6to4 / fec0 / 100:: / ::ffff:0:x', () => {
+    expect(isBlockedIpv6('64:ff9b::7f00:1')).toBe(true); // 127.0.0.1 embarquee
+    expect(isBlockedIpv6('64:ff9b::a05c:a821')).toBe(false); // 160.92.168.33 publique (DNS64)
+    expect(isBlockedIpv6('64:ff9b::c0a8:1')).toBe(true); // 192.168.0.1
     expect(isBlockedIpv6('2002:7f00:1::')).toBe(true);
     expect(isBlockedIpv6('fec0::1')).toBe(true);
     expect(isBlockedIpv6('fec1::1')).toBe(true); // fec0::/10
     expect(isBlockedIpv6('100::1')).toBe(true);
     expect(isBlockedIpv6('::ffff:0:7f00:1')).toBe(true);
     expect(isBlockedIpv6('2001::1')).toBe(true); // Teredo 2001:0::/32
+  });
+
+  // Review I1 (Gaby + Bob 14/11) : IPv4 dangereuses cachees dans le /96, ecritures variees.
+  it.each([
+    ['64:ff9b::a00:5', '10.0.0.5'],
+    ['64:ff9b::a9fe:a9fe', '169.254.169.254 (metadonnees cloud)'],
+    ['64:ff9b::6440:1', '100.64.0.1 (CGNAT)'],
+    ['64:ff9b::', '0.0.0.0'],
+    ['64:FF9B::7F00:1', 'majuscules'],
+    ['64:ff9b:0:0:0:0:7f00:1', 'sans compression'],
+    ['0064:ff9b::7f00:0001', 'zeros de tete'],
+    ['64:ff9b::127.0.0.1', 'notation pointee'],
+    ['64:ff9b::10.0.0.1', 'notation pointee privee'],
+    ['[64:ff9b::7f00:1]', 'crochets'],
+    ['64:ff9b::7f00:1%eth0', 'zone'],
+  ])('NAT64 /96 : %s refuse (%s)', (adresse) => {
+    expect(isBlockedIpv6(adresse)).toBe(true);
+  });
+
+  it.each(['64:ff9b::808:808', '64:ff9b::8.8.8.8', '64:ff9b::c7e8:aa72'])(
+    'NAT64 /96 : %s (IPv4 publique) autorise',
+    (adresse) => {
+      expect(isBlockedIpv6(adresse)).toBe(false);
+    },
+  );
+
+  // Trou trouve par Gaby : hors du /96, l'IPv4 n'est pas dans les 32 derniers bits.
+  it.each(['64:ff9b:1::808:808', '64:ff9b:5::808:808', '64:ff9b:0:0:1::808:808', '64:ff9b:0:1::808:808'])(
+    'NAT64 hors /96 : %s refuse (prefixe illisible pour la garde)',
+    (adresse) => {
+      expect(isBlockedIpv6(adresse)).toBe(true);
+    },
+  );
+
+  it('isBlockedIpv6 : adresse illisible refusee (fail-closed)', () => {
+    expect(isBlockedIpv6('64:ff9b::g')).toBe(true);
+    expect(isBlockedIpv6('1:2:3:4:5:6:7:8:9')).toBe(true);
+    expect(isBlockedIpv6('1::2::3')).toBe(true);
+  });
+
+  it('isBlockedIpv4 : plages de documentation refusees', () => {
+    expect(isBlockedIpv4('192.0.2.10')).toBe(true);
+    expect(isBlockedIpv4('198.51.100.7')).toBe(true);
+    expect(isBlockedIpv4('203.0.113.200')).toBe(true);
+    expect(isBlockedIpv4('203.0.114.1')).toBe(false);
   });
 
   it('isBlockedHost : nom public non bloque', () => {

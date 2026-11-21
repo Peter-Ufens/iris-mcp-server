@@ -18,7 +18,7 @@ interface IpApiResponse {
 export const tool: IrisTool = {
   id: 'ip-info-v1',
   description:
-    "Retourne la geolocalisation d'une adresse IP (ip-api.com, sans cle API).",
+    "Geoloc APPROXIMATIVE d'une IP (ip-api.com gratuit = HTTP clair, sans cle). Ville = celle de l operateur ou de la box, PAS le domicile. Ne jamais enchainer vers weather-v1. La sortie porte precision = approximative.",
   category: 'cloud',
   inputSchema: {
     ip: z
@@ -45,6 +45,7 @@ export const tool: IrisTool = {
         latitude: data.lat,
         longitude: data.lon,
         isp: data.isp,
+        precision: 'approximative',
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

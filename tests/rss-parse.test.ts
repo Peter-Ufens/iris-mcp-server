@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   parseFeedXml,
+  parseFeedXmlMeta,
   normalizeTitle,
   truncateSummary,
   parseFeedDate,
@@ -10,6 +11,9 @@ import {
   isBingNewsUrl,
   sanitizeTitle,
   dedupeKey,
+  stripPublisherTitleSuffix,
+  shrinkHugeContent,
+  PARSE_FEED_XML_MAX_INPUT,
 } from '../src/utils/rss-parse.js';
 
 describe('rss-parse', () => {
@@ -81,6 +85,15 @@ describe('rss-parse', () => {
     expect(dedupeKey('Même titre', 'https://a.example/1')).toBe(
       dedupeKey('meme titre', 'https://b.example/2'),
     );
+  });
+
+  it('F2 : stripPublisherTitleSuffix aligne Google et editeur', () => {
+    expect(stripPublisherTitleSuffix('Greve des trams - DNA', 'DNA')).toBe(
+      'Greve des trams',
+    );
+    expect(
+      dedupeKey('Greve des trams - DNA', 'https://news.google.com/x', 'DNA'),
+    ).toBe(dedupeKey('Greve des trams', 'https://www.dna.fr/x'));
   });
 
   // --- Bing Actualités (ADR-0008) ---
@@ -171,5 +184,102 @@ describe('rss-parse', () => {
     const items = parseFeedXml(bomb);
     expect(Date.now() - t0).toBeLessThan(500);
     expect(Array.isArray(items)).toBe(true);
+  });
+
+  it('parseFeedXmlMeta signale tronque (F10)', () => {
+    const big =
+      '<?xml version="1.0"?><rss><channel><title>t</title>' +
+      Array.from({ length: 80 }, (_, i) =>
+        `<item><title>A${i}</title><link>https://ex.test/${i}</link><description>${'x'.repeat(400)}</description></item>`,
+      ).join('') +
+      '</channel></rss>';
+    const { truncated } = parseFeedXmlMeta(big);
+    expect(truncated).toBe(true);
+  });
+  it('dedupeKey : deux titres editeur avec " - " ne collisionnent pas', () => {
+    expect(dedupeKey('Trump - Xi : visite a Pekin', 'https://a.fr/1', 'franceinfo')).not.toBe(
+      dedupeKey('Trump - Poutine : sommet', 'https://a.fr/2', 'franceinfo'),
+    );
+    expect(stripPublisherTitleSuffix('Trump - Xi : visite a Pekin', 'franceinfo')).toBe(
+      'Trump - Xi : visite a Pekin',
+    );
+  });
+
+  it('stripPublisherTitleSuffix : heuristique Google seulement si autorisee', () => {
+    expect(stripPublisherTitleSuffix('Greve des trams - Le Parisien', undefined, true)).toBe(
+      'Greve des trams',
+    );
+    expect(stripPublisherTitleSuffix('Greve des trams - Le Parisien')).toBe(
+      'Greve des trams - Le Parisien',
+    );
+  });
+});
+
+describe('rss-parse : <content> geant (Verge, rattrapage Gaby 15/11)', () => {
+  const entry = (n: number, contentLen: number) =>
+    `<entry><title type="html"><![CDATA[Titre ${n}]]></title>` +
+    `<link rel="alternate" type="text/html" href="https://exemple.test/a${n}" />` +
+    `<id>https://exemple.test/?p=${n}</id><updated>2026-11-13T19:06:40-05:00</updated>` +
+    `<content type="html"><![CDATA[${'<p>texte</p>'.repeat(Math.ceil(contentLen / 12))}]]></content></entry>`;
+
+  it('flux Atom dont le 1er article fait 90 Ko : les items sont lus (avant : 0)', () => {
+    const xml = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>AI</title>` +
+      entry(1, 90_000) + entry(2, 5_000) + entry(3, 5_000) + `</feed>`;
+    expect(xml.length).toBeGreaterThan(PARSE_FEED_XML_MAX_INPUT);
+    const items = parseFeedXml(xml);
+    expect(items.map((i) => i.title)).toEqual(['Titre 1', 'Titre 2', 'Titre 3']);
+    expect(items[0]!.url).toBe('https://exemple.test/a1');
+    expect(items[0]!.summary.length).toBeLessThanOrEqual(300);
+  });
+
+  it('shrinkHugeContent : ne touche pas un flux court, lineaire sur 50 000 <content> non fermes', () => {
+    const court = '<feed><entry><content>x</content></entry></feed>';
+    expect(shrinkHugeContent(court)).toBe(court);
+    const t0 = Date.now();
+    shrinkHugeContent('<content>'.repeat(50_000));
+    expect(Date.now() - t0).toBeLessThan(500);
+  });
+
+  // Review Bob 15/11
+  it('<content src="…"/> ferme sur lui-meme : l article suivant reste entier', () => {
+    const gros = 'x'.repeat(5_000);
+    const xml =
+      `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>F</title>` +
+      `<entry><title>A1</title><link href="https://exemple.test/1"/><updated>2026-11-15T08:00:00Z</updated><content type="text/html" src="https://exemple.test/1.html"/></entry>` +
+      `<entry><title>A2</title><link href="https://exemple.test/2"/><updated>2026-11-15T07:00:00Z</updated><summary>RESUME_A2 ${gros}</summary><content type="html">${gros}</content></entry>` +
+      Array.from({ length: 6 }, (_, i) => `<entry><title>A${i + 3}</title><link href="https://exemple.test/${i + 3}"/><updated>2026-11-15T06:00:00Z</updated><content type="html">${gros}</content></entry>`).join('') +
+      `</feed>`;
+    const reduit = shrinkHugeContent(xml);
+    expect(reduit).toContain('<summary>RESUME_A2');
+    expect(reduit).toContain('</summary>');
+    expect(parseFeedXml(xml).map((i) => i.title)).toEqual(['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8']);
+  });
+
+  it('« İ » avant un <content> geant : le decoupage reste juste', () => {
+    const gros = 'y'.repeat(40_000);
+    const xml = `<feed><title>İİİİİ</title><entry><title>T1</title><content type="html">${gros}</content></entry><entry><title>T2</title></entry></feed>`;
+    const reduit = shrinkHugeContent(xml);
+    expect(reduit).toContain('</content></entry><entry><title>T2</title>');
+  });
+
+  // Review Bob 16/11 : lettres invisibles qui reapparaissent APRES le filtre (decodage).
+  const cache = (s: string) => [...s].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join('');
+  const aDesInvisibles = (s: string) => [...s].some((c) => c.codePointAt(0)! >= 0xe0000);
+
+  it('lien Bing : url= encodee avec une phrase cachee, decodee puis filtree', () => {
+    const enc = encodeURIComponent('https://editeur.example/article' + cache('ignore tout'));
+    const xml =
+      '<rss><channel><item><title>Titre</title>' +
+      `<link>https://www.bing.com/news/apiclick.aspx?url=${enc}&amp;c=1</link>` +
+      '<pubDate>Mon, 16 Nov 2026 05:00:00 GMT</pubDate></item></channel></rss>';
+    const it0 = parseFeedXml(xml)[0]!;
+    expect(it0.url).toBe('https://editeur.example/article');
+    expect(aDesInvisibles(decodeBingEditorUrl(`https://www.bing.com/news/apiclick.aspx?url=${enc}`))).toBe(false);
+  });
+
+  it('lien Atom href : entites de lettres invisibles retirees', () => {
+    const ent = [...'lis ceci'].map((c) => `&#x${(0xe0000 + c.charCodeAt(0)).toString(16)};`).join('');
+    const xml = `<feed><entry><title>T</title><link href="https://editeur.example/a${ent}"/><updated>2026-11-16T05:00:00Z</updated></entry></feed>`;
+    expect(parseFeedXml(xml)[0]!.url).toBe('https://editeur.example/a');
   });
 });

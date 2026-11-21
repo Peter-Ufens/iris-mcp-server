@@ -1,7 +1,7 @@
 import * as z from 'zod/v4';
 import { open, stat } from 'node:fs/promises';
 import type { IrisTool } from './_types.js';
-import { validatePath, PathGuardError } from '../utils/path-guard.js';
+import { validatePath, assertNotSecretFile, PathGuardError } from '../utils/path-guard.js';
 
 const DEFAULT_MAX_CHARS = 200_000;
 const HARD_MAX_CHARS = 200_000;
@@ -43,7 +43,7 @@ async function readUtf8Capped(
 export const tool: IrisTool = {
   id: 'fs-read-v1',
   description:
-    "Lit le contenu d'un fichier dans les repertoires autorises (ALLOWED_ROOTS). Securise contre le path traversal et les symlinks sortants. Plafond de caracteres (comme fetch-url).",
+    "Lit le contenu d'un fichier dans les repertoires autorises (ALLOWED_ROOTS). Securise contre le path traversal et les symlinks sortants. Refuse toujours les fichiers de secrets (.env et ses copies, cles, certificats, jetons, configs MCP) et les dossiers de secrets (.git, .ssh, secrets) ; les modeles .env.example restent lisibles. Plafond de caracteres (comme fetch-url).",
   category: 'filesystem',
   inputSchema: {
     path: z.string().describe('Chemin absolu du fichier a lire'),
@@ -60,6 +60,8 @@ export const tool: IrisTool = {
     const maxChars = (input.max_chars as number | undefined) ?? DEFAULT_MAX_CHARS;
     try {
       const safePath = await validatePath(inputPath);
+      // S0 Bob 14/11 : nom demande ET vrai fichier (realpath), avant toute ouverture.
+      assertNotSecretFile(inputPath, safePath);
       const { content, truncated, size_bytes } = await readUtf8Capped(safePath, maxChars);
       return {
         content: [

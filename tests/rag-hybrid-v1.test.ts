@@ -31,13 +31,16 @@ interface Doc {
  * `corpus` = passages ou le filtre texte cherche (sous-chaine sensible a la casse, comme Qdrant),
  * en ignorant volontairement le filtre de zone serveur quand `ignoreServerFilter` est vrai.
  */
-function stub(opts: { vector: Doc[]; corpus: Doc[]; ignoreServerFilter?: boolean; capture?: any[] }) {
+function stub(opts: { vector: Doc[]; corpus: Doc[]; ignoreServerFilter?: boolean; capture?: any[]; ollamaDown?: boolean }) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: { body?: string }) => {
       const u = String(url);
       const body = init?.body ? JSON.parse(init.body) : {};
-      if (u.endsWith('/api/embeddings')) return { ok: true, json: async () => ({ embedding: [0.1, 0.2] }) };
+      if (u.endsWith('/api/embeddings')) {
+        if (opts.ollamaDown) throw new Error('ECONNREFUSED');
+        return { ok: true, json: async () => ({ embedding: [0.1, 0.2] }) };
+      }
       if (u.includes('/points/search')) {
         return {
           ok: true,
@@ -51,11 +54,12 @@ function stub(opts: { vector: Doc[]; corpus: Doc[]; ignoreServerFilter?: boolean
       }
       if (u.includes('/points/scroll')) {
         opts.capture?.push(body);
-        const should: Array<{ key: string; match: { text: string } }> = body.filter.must[0].should;
+        // Chaque groupe de `must` doit etre satisfait (un terme par groupe, en plusieurs casses), comme Qdrant.
+        const groupes: Array<Array<{ key: string; match: { text: string } }>> = body.filter.must.map((m: any) => m.should);
         const mustNot: Array<{ match: { text: string } }> = body.filter.must_not ?? [];
         const points = opts.corpus
           .map((d) => ({ sourceFile: `${V}${d.path}`, source_filename: d.path.split('\\').pop(), text: d.text }))
-          .filter((p) => should.some((c) => String((p as any)[c.key]).includes(c.match.text)))
+          .filter((p) => groupes.every((should) => should.some((c) => String((p as any)[c.key]).includes(c.match.text))))
           .filter((p) => opts.ignoreServerFilter || !mustNot.some((m) => p.sourceFile.includes(m.match.text)));
         return { ok: true, json: async () => ({ result: { points: points.map((payload) => ({ payload })) } }) };
       }
@@ -186,6 +190,64 @@ describe('rag-hybrid-v1 / recherche', () => {
     expect(za.hits.some((h) => h.sourceFile.includes('zone-alpha-sensitive'))).toBe(false);
     expect(za.hits.some((h) => h.sourceFile.includes('from-vendor-chat'))).toBe(true);
     expect(za.meta.strictPrivateAlwaysFiltered).toBe(true);
+  });
+
+  it('Ollama coupe : le lexical devient le seul canal, a pleine force, et le mode degrade est annonce (review Bob 16/11)', async () => {
+    const weak: Doc = { path: '02-Projets\\Faible.md', text: 'un texte elargi' };
+    stub({ vector: [], corpus: [...noise, weak], ollamaDown: true });
+    const r = await ragHybrid({ query: 'Process Complet elargi etape Maison', patternsFile });
+    // Avant : mode faible (2 termes minimum) => 0 resultat alors que la note porte « elargi ».
+    expect(r.hits.map((h) => h.sourceFile).some((p) => p.includes('Faible.md'))).toBe(true);
+    expect(r.meta.poidsLexical).toBe(1);
+    expect(r.meta.modeDegrade).toBe('lexical_seul');
+    expect(String(r.meta.conseil)).toMatch(/Mode degrade/);
+    expect(String(r.meta.error)).toMatch(/Ollama/);
+  });
+
+  // Correction C1 (Bob 20/11, CP1 rejoue sur le vrai vault : « Iris » et « Iris MCP » donnaient 0 sans Ollama).
+  it('Ollama coupe + termes tres frequents (plus de 256 passages) : la note qui les porte TOUS ressort', async () => {
+    const lyra: Doc[] = Array.from({ length: 300 }, (_, i) => ({ path: `conversations\\ws\\l-${i}.md`, text: `Lyra ${i}` }));
+    const orion: Doc[] = Array.from({ length: 300 }, (_, i) => ({ path: `conversations\\ws\\o-${i}.md`, text: `Orion ${i}` }));
+    const cible: Doc = { path: '01-Autre\\Synthese.md', text: 'Lyra parle a Orion tous les matins' };
+    stub({ vector: [], corpus: [...lyra, ...orion, cible], ollamaDown: true });
+    const r = await ragHybrid({ query: 'Lyra Orion', patternsFile });
+    expect(r.hits[0]!.sourceFile).toContain('Synthese.md');
+    expect(r.hits[0]!.trouvePar).toEqual(['lexical']);
+    expect((r.meta.termesLexicaux as any[]).every((t) => t.courant)).toBe(true);
+    expect((r.meta.rattrapageModeDegrade as any).termes).toEqual(['Lyra', 'Orion']);
+    expect(r.meta.modeDegrade).toBe('lexical_seul');
+  });
+
+  it('Ollama coupe + un seul terme tres frequent : le fichier qui le porte dans son NOM passe en tete', async () => {
+    const bruit: Doc[] = Array.from({ length: 300 }, (_, i) => ({ path: `conversations\\ws\\c-${i}.md`, text: `Lyra ${i}` }));
+    const fiche: Doc = { path: '02-Projets\\Lyra.md', text: 'fiche du projet' };
+    stub({ vector: [], corpus: [...bruit, fiche], ollamaDown: true });
+    const r = await ragHybrid({ query: 'Lyra', patternsFile });
+    expect(r.hits[0]!.sourceFile).toContain('02-Projets\\Lyra.md');
+    expect(r.hits[0]!.dansLeChemin).toBe(true);
+  });
+
+  it('GARDE-FOU C1 : le rattrapage du mode degrade ne sort jamais la zone sensible', async () => {
+    const lyra: Doc[] = Array.from({ length: 300 }, (_, i) => ({ path: `conversations\\ws\\l-${i}.md`, text: `Lyra ${i}` }));
+    const secret: Doc = { path: 'zone-alpha-sensitive\\Lyra-Orion.md', text: 'Lyra Orion secret' };
+    stub({ vector: [], corpus: [...lyra, secret], ollamaDown: true, ignoreServerFilter: true });
+    const r = await ragHybrid({ query: 'Lyra Orion', patternsFile, includeZoneA: true });
+    expect(r.hits.some((h) => h.sourceFile.includes('zone-alpha-sensitive'))).toBe(false);
+  });
+
+  it('Ollama present : un terme courant reste ignore (pas de rattrapage hors mode degrade)', async () => {
+    const many: Doc[] = Array.from({ length: 300 }, (_, i) => ({ path: `conversations\\ws\\c-${i}.md`, text: `Lyra ${i}` }));
+    stub({ vector: [{ path: '01-Autre\\Decision.md', text: 'decision Lyra' }], corpus: many });
+    const r = await ragHybrid({ query: 'Lyra', patternsFile });
+    expect(r.meta.rattrapageModeDegrade).toBeUndefined();
+    expect(r.hits[0]!.sourceFile).toContain('Decision.md');
+  });
+
+  it('Ollama present : pas de mode degrade annonce', async () => {
+    const target: Doc = { path: '02-Projets\\Serveurs.md', text: 'le serveur SRV-042 heberge le controleur' };
+    stub({ vector: [target], corpus: [target] });
+    const r = await ragHybrid({ query: 'SRV-042', patternsFile });
+    expect(r.meta.modeDegrade).toBeUndefined();
   });
 
   it('question sans terme distinctif : conseil vers rag-search-v2', async () => {

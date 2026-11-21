@@ -55,4 +55,10 @@ describe('news-v1', () => {
       expect.stringContaining('hitsPerPage=5'),
     );
   });
+
+  it('F14 : description dit Hacker News seulement (pas presse generale)', () => {
+    expect(tool.description).toMatch(/Hacker News/i);
+    expect(tool.description).toMatch(/actu-rss-v1/);
+    expect(tool.description).not.toMatch(/presse generale sans precision/i);
+  });
 });

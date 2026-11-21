@@ -379,6 +379,18 @@ export function jsonResult(payload: unknown) {
   };
 }
 
+/** Echec outil avec charge utile propre (ex. { ok: false, error } des prises) : isError MCP (review Gaby 16/11). */
+export function jsonEchec(payload: unknown) {
+  return {
+    ...jsonResult(payload),
+    isError: true as const,
+  };
+}
+
+/** Echec outil : JSON `{ error }` + drapeau MCP `isError` (lot Q / Gaby). */
 export function errorResult(message: string) {
-  return jsonResult({ error: message });
+  return {
+    ...jsonResult({ error: message }),
+    isError: true as const,
+  };
 }

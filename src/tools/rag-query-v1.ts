@@ -2,6 +2,8 @@ import * as z from 'zod/v4';
 import { readFileSync } from 'node:fs';
 import type { IrisTool } from './_types.js';
 import { avecJournal } from '../utils/rag-journal.js';
+import { embedLocal } from '../utils/local-embeddings.js';
+import { causeErreurQdrant, estPanneRag, postQdrant, resoudreBaseOllama, resoudreBaseQdrant } from '../utils/rag-http.js';
 
 /**
  * rag-query-v1 : interroge le RAG vault de Peter (Qdrant :6334 + embeddings Ollama).
@@ -24,7 +26,6 @@ import { avecJournal } from '../utils/rag-journal.js';
  */
 
 const DEFAULT_QDRANT = 'http://127.0.0.1:6334';
-const DEFAULT_OLLAMA = 'http://127.0.0.1:11434';
 const DEFAULT_COLLECTION = 'vault-text';
 const DEFAULT_EMBED_MODEL = 'nomic-embed-text';
 
@@ -268,23 +269,6 @@ export function rankHitsWithPriority(
   return out;
 }
 
-async function postJson(url: string, body: unknown, timeoutMs: number): Promise<unknown> {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    return await res.json();
-  } finally {
-    clearTimeout(t);
-  }
-}
-
 export interface RagQueryInput {
   query: string;
   limit?: number;
@@ -304,8 +288,10 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
   const includeZoneA = input.includeZoneA === true;
   const includeReserved = effectiveIncludeReserved(input.includeReserved);
   const collection = input.collection ?? process.env.QDRANT_COLLECTION ?? DEFAULT_COLLECTION;
-  const qdrant = (input.qdrantUrl ?? process.env.QDRANT_URL ?? DEFAULT_QDRANT).replace(/\/+$/, '');
-  const ollama = (input.ollamaUrl ?? process.env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA).replace(/\/+$/, '');
+  // Bases en loopback par defaut ; une valeur refusee arrete l appel avant tout reseau (review Gaby 16/11).
+  const baseQ = resoudreBaseQdrant(process.env, input.qdrantUrl);
+  const baseO = resoudreBaseOllama(process.env, input.ollamaUrl);
+  const qdrant = baseQ.ok ? baseQ.url : DEFAULT_QDRANT;
   const embedModel = input.embedModel ?? process.env.RAG_EMBED_MODEL ?? DEFAULT_EMBED_MODEL;
 
   const patterns = loadZonePatterns(input.patternsFile ?? resolvePatternsFile());
@@ -350,20 +336,22 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
     return base;
   }
 
-  // 1) embedding
-  let vector: number[];
-  try {
-    const emb = (await postJson(
-      `${ollama}/api/embeddings`,
-      { model: embedModel, prompt: input.query },
-      30_000,
-    )) as { embedding?: number[] };
-    if (!emb.embedding || emb.embedding.length === 0) throw new Error('reponse sans embedding');
-    vector = emb.embedding;
-  } catch (e) {
-    base.meta.error = [base.meta.error, `Ollama injoignable ou modele absent (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
+  const refusBase = [baseQ.ok ? '' : baseQ.erreur, baseO.ok ? '' : baseO.erreur].filter(Boolean);
+  if (refusBase.length > 0) {
+    base.meta.error = [base.meta.error, ...refusBase].filter(Boolean).join(' · ');
     return base;
   }
+
+  // 1) embedding : Ollama puis Hermes :18434 (lot O · pas de 3e llama-server)
+  const emb = await embedLocal(input.query, { model: embedModel, timeoutMs: 10_000, ollamaBase: input.ollamaUrl, outil: 'rag-query-v1' });
+  if (!emb.ok) {
+    base.meta.error = [base.meta.error, `Ollama injoignable ou modele absent (${emb.erreur})`].filter(Boolean).join(' · ');
+    return base;
+  }
+  const vector = emb.vector;
+  (base.meta as Record<string, unknown>).moteurEmbed = emb.moteur;
+  // Review Gaby 16/11 : dire pourquoi le secours a joue (causes courtes, nettoyees).
+  if (emb.moteur !== 'ollama') (base.meta as Record<string, unknown>).embedRepli = emb.tentatives;
 
   // 2) recherche Qdrant, filtre zone cote serveur
   // Sur-echantillonnage : filtres post + reclassement poids + dedup mangent des hits.
@@ -385,14 +373,15 @@ export async function ragQuery(input: RagQueryInput): Promise<RagQueryResult> {
 
   let raw: Array<{ score?: number; payload?: Record<string, unknown> }>;
   try {
-    const res = (await postJson(
-      `${qdrant}/collections/${encodeURIComponent(collection)}/points/search`,
+    const res = (await postQdrant(
+      qdrant,
+      `/collections/${encodeURIComponent(collection)}/points/search`,
       searchBody,
       60_000,
     )) as { result?: Array<{ score?: number; payload?: Record<string, unknown> }> };
     raw = Array.isArray(res.result) ? res.result : [];
   } catch (e) {
-    base.meta.error = [base.meta.error, `Qdrant injoignable (${e instanceof Error ? e.message : String(e)})`].filter(Boolean).join(" · ");
+    base.meta.error = [base.meta.error, await causeErreurQdrant(e, qdrant, collection, vector.length)].filter(Boolean).join(' · ');
     return base;
   }
 
@@ -474,7 +463,7 @@ export const tool: IrisTool = {
         includeZoneA: input.includeZoneA as boolean | undefined,
         includeReserved: input.includeReserved as boolean | undefined,
       });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }], ...(estPanneRag(result) ? { isError: true } : {}) };
     } catch (e) {
       // Contrat Iris : ne JAMAIS planter, retourner une erreur propre dans le JSON.
       const msg = e instanceof Error ? e.message : String(e);
@@ -489,6 +478,7 @@ export const tool: IrisTool = {
             ),
           },
         ],
+        isError: true,
       };
     }
   }),

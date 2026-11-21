@@ -2,6 +2,7 @@ import * as z from 'zod/v4';
 import type { IrisTool } from './_types.js';
 import { fetchJson } from '../utils/http-fetch.js';
 import { jsonResult, errorResult } from '../utils/git-run.js';
+import { retirerInvisibles } from '../utils/texte-invisible.js';
 
 interface HnHit {
   title: string;
@@ -18,8 +19,12 @@ interface HnSearchResponse {
 export const tool: IrisTool = {
   id: 'news-v1',
   description:
-    'Retourne les N articles en tete de Hacker News. Algolia HN API, gratuit, sans cle API.',
+    'Hacker News seulement (front page Algolia HN API) : pas une presse generale. Pour l actualite FR/monde, utiliser actu-rss-v1. Gratuit, sans cle API.',
   category: 'cloud',
+  annotations: {
+    readOnlyHint: true,
+    openWorldHint: true,
+  },
   inputSchema: {
     limit: z
       .number()
@@ -38,11 +43,13 @@ export const tool: IrisTool = {
       const hits = data.hits ?? [];
       return jsonResult({
         count: hits.length,
+        contenu_non_fiable: true,
         articles: hits.map((h) => ({
-          title: h.title,
-          url: h.url,
+          title: retirerInvisibles(h.title ?? ''),
+          url: retirerInvisibles(h.url ?? ''),
           points: h.points,
           comments: h.num_comments,
+          contenu_non_fiable: true,
         })),
       });
     } catch (e) {
